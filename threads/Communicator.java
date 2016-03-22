@@ -34,7 +34,12 @@ public class Communicator {
         hasActiveSpeaker = true;
 
         this.word = word;
-        audience.wake();
+        this.fetched = false;
+
+        while (this.fetched == false) {
+            audience.wake();
+            speaker.sleep();
+        }
 
         numSpeaker -= 1;
         hasActiveSpeaker = false;
@@ -56,8 +61,15 @@ public class Communicator {
             audience.sleep();
         }
         hasActiveAudience = true;
+
+        while (this.fetched == true) {
+            speaker.wake();
+            audience.sleep();
+        }
+
         int ret = this.word;
-        speaker.wake();
+        this.fetched = true;
+        speaker.wakeAll();
 
         numAudience -= 1;
         hasActiveAudience = false;
@@ -78,6 +90,8 @@ public class Communicator {
     boolean hasActiveSpeaker;
     int numAudience;
     boolean hasActiveAudience;
+
+    boolean fetched = true;
 
     private Lock sharedLock = new Lock();
     private Condition speaker = new Condition(sharedLock);
