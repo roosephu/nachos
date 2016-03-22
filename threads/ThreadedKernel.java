@@ -1,5 +1,6 @@
 package nachos.threads;
 
+import nachos.ag.BoatGrader;
 import nachos.machine.*;
 
 /**
@@ -46,12 +47,13 @@ public class ThreadedKernel extends Kernel {
      * tests here.
      */
     public void selfTest() {
-        KThread.selfTest();
-        Semaphore.selfTest();
-        SynchList.selfTest();
-        if (Machine.bank() != null) {
-            ElevatorBank.selfTest();
-        }
+        Boat.selfTest();
+//        KThread.selfTest();
+//        Semaphore.selfTest();
+//        SynchList.selfTest();
+//        if (Machine.bank() != null) {
+//            ElevatorBank.selfTest();
+//        }
     }
 
     /**
@@ -59,7 +61,6 @@ public class ThreadedKernel extends Kernel {
      * nothing.
      */
     public void run() {
-
     }
 
     /**

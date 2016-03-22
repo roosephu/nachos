@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import javax.crypto.Mac;
 import java.util.*;
 
 /**
@@ -132,6 +133,7 @@ public class PriorityScheduler extends Scheduler {
             Lib.assertTrue(Machine.interrupt().disabled());
             ThreadState threadState = getThreadState(thread);
 
+            threadState.updateTime();
             priorityQueue.add(threadState);
 
             // must run after priorityQueue.add
@@ -194,12 +196,12 @@ public class PriorityScheduler extends Scheduler {
                     diff = a.getPriority() - b.getPriority();
                 }
                 if (diff != 0)
-                    return diff;
+                    return -diff;
 
                 if (a.startTime > b.startTime)
-                    return -1;
-                if (a.startTime < b.startTime)
                     return 1;
+                if (a.startTime < b.startTime)
+                    return -1;
                 return 0;
             }
         }
@@ -230,10 +232,14 @@ public class PriorityScheduler extends Scheduler {
          */
         public ThreadState(KThread thread) {
             this.thread = thread;
-            this.startTime = Machine.timer().getTime();
 
+            updateTime();
             setPriority(priorityDefault);
             updateEffectivePriority();
+        }
+
+        public void updateTime() {
+            startTime = Machine.timer().getTime();
         }
 
         /**
