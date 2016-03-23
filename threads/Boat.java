@@ -8,14 +8,16 @@ public class Boat {
     public static void selfTest() {
         BoatGrader b = new BoatGrader();
 
+        int adults = 10, children = 10;
+
 //        System.out.println("\n ***Testing Boats with only 2 children***");
 //        begin(0, 5, b);
 
 //	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
 //  	begin(1, 2, b);
 
-  	System.out.println("\n ***Testing Boats with 3 children, 3 adults***");
-  	begin(3, 3, b);
+  	System.out.println("\n ***Testing Boats with " + Integer.toString(children) + " children, " + Integer.toString(adults) + " adults***");
+  	begin(adults, children, b);
     }
 
     public static void begin(int adults, int children, BoatGrader b) {
@@ -48,6 +50,8 @@ public class Boat {
 
         while (true) {
             if (communicator.listen() == adults + children) {
+//                finishedTravel = true;
+//                molokai.wake();
                 break;
             }
         }
@@ -148,6 +152,7 @@ public class Boat {
                 }
             } else {
                 communicator.speak(numAdultMolokai + numChildMolokai);
+//                molokai.sleep();
                 if (finishedTravel) {
                     break;
                 }

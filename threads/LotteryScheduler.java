@@ -2,9 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 
-import java.util.TreeSet;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.*;
 
 /**
  * A scheduler that chooses threads using a lottery.
@@ -43,6 +41,62 @@ public class LotteryScheduler extends PriorityScheduler {
      */
     public ThreadQueue newThreadQueue(boolean transferPriority) {
 	// implement me
-	return null;
+        return new RandomQueue();
+    }
+
+    private class RandomQueue extends ThreadQueue {
+        /**
+         * Add a thread to the end of the wait queue.
+         *
+         * @param thread the thread to append to the queue.
+         */
+        public void waitForAccess(KThread thread) {
+            Lib.assertTrue(Machine.interrupt().disabled());
+
+            waitQueue.add(thread);
+        }
+
+        /**
+         * Remove a thread from the beginning of the queue.
+         *
+         * @return the first thread on the queue, or <tt>null</tt> if the
+         * queue is
+         * empty.
+         */
+        public KThread nextThread() {
+            Lib.assertTrue(Machine.interrupt().disabled());
+
+            if (waitQueue.isEmpty())
+                return null;
+
+            int random = (int) (Math.random() * waitQueue.size());
+            KThread thread = waitQueue.get(random);
+            waitQueue.remove(thread);
+            return thread;
+        }
+
+        /**
+         * The specified thread has received exclusive access, without using
+         * <tt>waitForAccess()</tt> or <tt>nextThread()</tt>. Assert that no
+         * threads are waiting for access.
+         */
+        public void acquire(KThread thread) {
+            Lib.assertTrue(Machine.interrupt().disabled());
+
+            Lib.assertTrue(waitQueue.isEmpty());
+        }
+
+        /**
+         * Print out the contents of the queue.
+         */
+        public void print() {
+            Lib.assertTrue(Machine.interrupt().disabled());
+
+            for (Iterator i = waitQueue.iterator(); i.hasNext(); )
+                System.out.print((KThread) i.next() + " ");
+        }
+
+        private ArrayList<KThread> waitQueue = new ArrayList<>();
+
     }
 }
