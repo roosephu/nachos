@@ -56,7 +56,7 @@ public class Boat {
             }
         }
 
-        System.out.printf("done\n");
+        System.out.println("done");
     }
 
     static void AdultItinerary() {
