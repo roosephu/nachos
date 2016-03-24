@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.LinkedList;
+
 /**
  * An implementation of condition variables that disables interrupt()s for
  * synchronization.
@@ -33,7 +35,18 @@ public class Condition2 {
     public void sleep() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
+        Lock waiter = new Lock();
 	conditionLock.release();
+
+        /**
+         * The idea is that: the lock is initialized to non-empty, and the process
+         * keeps acquiring it. If one process call wake(), it will release the lock
+         * in the head of the queue, and the corresponding process is waken up.
+         */
+        waiter.acquire();
+        lockList.add(waiter);
+        waiter.acquire();
+        waiter.release();
 
 	conditionLock.acquire();
     }
@@ -44,6 +57,10 @@ public class Condition2 {
      */
     public void wake() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
+        if (!lockList.isEmpty()) {
+            lockList.removeFirst().release();
+        }
     }
 
     /**
@@ -52,7 +69,12 @@ public class Condition2 {
      */
     public void wakeAll() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
+        while (!lockList.isEmpty()) {
+            wake();
+        }
     }
 
     private Lock conditionLock;
+    private LinkedList<Lock> lockList;
 }
