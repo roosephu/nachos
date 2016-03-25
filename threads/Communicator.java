@@ -1,5 +1,7 @@
 package nachos.threads;
 
+import nachos.machine.Lib;
+
 /**
  * A <i>communicator</i> allows threads to synchronously exchange 32-bit
  * messages. Multiple threads can be waiting to <i>speak</i>,
@@ -96,4 +98,93 @@ public class Communicator {
     private Lock sharedLock = new Lock();
     private Condition speaker = new Condition(sharedLock);
     private Condition audience = new Condition(sharedLock);
+}
+
+class CommunicatorTest {
+    static final int SPEAK = 0;
+    static final int LISTEN = 1;
+
+    static int numClients = 6;
+    static int numClientLoop = 4;
+    static int leftBits = numClients * numClientLoop;
+    static int leftOnes = leftBits / 2;
+    static int currentBalance = 0;
+
+    static int[] status;
+
+    /**
+     * Used for testing.
+     * The bit decides whether a client speaks or listens.
+     * There must be at least one client speaking or listening.
+     */
+    static int nextBit() {
+        double random = Math.random();
+        if ((currentBalance != numClients - 1 && random * leftBits < leftOnes) || currentBalance == 1 - numClients) {
+            currentBalance += 1;
+            leftBits -= 1;
+            return SPEAK;
+        }
+        currentBalance -= 1;
+        leftOnes -= 1;
+        leftBits -= 1;
+        return LISTEN;
+    }
+
+    private static class PingPong implements Runnable {
+        Communicator communicator;
+        int id;
+
+        public PingPong(Communicator communicator1, int id1) {
+            communicator = communicator1;
+            id = id1;
+        }
+
+        void report(int method, int answer) {
+            if (method == SPEAK) {
+                Lib.debug('x',  String.format("@%d Speaking %09d", id, answer));
+                status[id] = answer;
+            } else {
+                int found = -1;
+                for (int i = 0; i < numClientLoop; ++i) {
+                    if (status[i] == answer) {
+                        found = i;
+                        status[i] = -1;
+                        break;
+                    }
+                }
+                Lib.assertTrue(found >= 0);
+
+                Lib.debug('x', String.format("@%d Listened %09d from %d", id, answer, found));
+            }
+        }
+
+        public void run() {
+            for (int i = 0; i < numClientLoop; ++i) { // randomly speaking or listening
+                int bit = nextBit();
+                if (bit == 0) {
+                    int x = (int) (Math.random() * 1e9);
+                    report(SPEAK, x);
+                    communicator.speak(x);
+                } else {
+                    Lib.debug('x', String.format("> @%d: listen", id));
+                    int y = communicator.listen();
+                    report(LISTEN, y);
+                }
+            }
+        }
+    }
+
+    public static void selfTest() {
+        status = new int[numClients];
+
+        Lib.debug('t', "Self test for Communicator");
+
+        Communicator communicator = new Communicator();
+        for (int i = 1; i < numClients; ++i) {
+            new KThread(new PingPong(communicator, i)).setName("child" + Integer.toString(i)).fork();
+        }
+
+        new PingPong(communicator, 0).run();
+    }
+
 }
