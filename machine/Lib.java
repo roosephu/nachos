@@ -76,6 +76,21 @@ public final class Lib {
 	if (!expression)
 	    throw new AssertionFailureError();
     }
+    
+    /**
+     * Asserts that <i>expression</i> is <tt>true</tt>. If not, then Nachos
+     * exits with an error message. Used for test.
+     *
+     * @param	expression	the expression to assert.
+     */     
+    public static void assertTrueTest(boolean expression) {
+	if (!expression)
+	    throw new AssertionFailureError();
+    }
+    
+    public static void printTest(String message) {
+    	System.out.println(message);
+    }
 
     /**
      * Asserts that <i>expression</i> is <tt>true</tt>. If not, then Nachos
