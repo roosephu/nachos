@@ -61,12 +61,12 @@ public class Alarm {
          * Since we use a priority queue here, we need to check just one element
          * which is the smallest one.
          */
-
+    	boolean initStatus = Machine.interrupt().disable();
         long currentTime = Machine.timer().getTime();
 
         while (!waitQueue.isEmpty()) {
             PriorThread priorThread = waitQueue.peek();
-            if (priorThread.priority > currentTime) { /** we are ready! */
+            if (priorThread.priority >= currentTime) { /** we are ready! */
                 waitQueue.poll();
                 priorThread.thread.ready();
             } else {  /** don't need to see other processes */
@@ -76,6 +76,7 @@ public class Alarm {
 
         // continue the original
         KThread.currentThread().yield();
+        Machine.interrupt().restore(initStatus);
     }
 
     /**
@@ -94,9 +95,11 @@ public class Alarm {
      */
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
+	
 
         boolean initStatus = Machine.interrupt().disable();
+        
+        long wakeTime = Machine.timer().getTime() + x;
 
         // We add current thread to the priority queue, and let it sleep.
         KThread currentThread = KThread.currentThread();
