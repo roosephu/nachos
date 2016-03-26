@@ -1,10 +1,9 @@
 package nachos.threads;
 
-import nachos.machine.Interrupt;
 import nachos.machine.Lib;
 
-import java.lang.reflect.Array;
 import java.util.LinkedList;
+import java.util.Random;
 
 /**
  * A <i>communicator</i> allows threads to synchronously exchange 32-bit
@@ -33,23 +32,20 @@ public class Communicator {
     public void speak(int word) {
         sharedLock.acquire(); // acquire the lock so that no speakers or audience can enter
 
-        numSpeaker += 1;
-        while (numAudience == 0 || hasActiveSpeaker) {
+        waitSpeakers += 1;
+        while (!hasActiveAudience || hasActiveSpeaker) {
             speaker.sleep();
         }
+        waitSpeakers -= 1;
         hasActiveSpeaker = true;
 
         this.word = word;
-        this.fetched = false;
+        pair.wake();
+        pair.sleep();
 
-        while (this.fetched == false) {
-            audience.wake();
-            speaker.sleep();
-        }
-
-        numSpeaker -= 1;
         hasActiveSpeaker = false;
-        speaker.wake();
+        if (waitSpeakers > 0)
+            speaker.wake();
         sharedLock.release();
     }
 
@@ -62,24 +58,21 @@ public class Communicator {
     public int listen() {
         sharedLock.acquire(); // acquire the lock so that no speakers or audience can enter
 
-        numAudience += 1;
-        while (numSpeaker == 0 || hasActiveAudience) {
+        waitAudiences += 1;
+        while (hasActiveAudience) {
             audience.sleep();
         }
+        waitAudiences -= 1;
         hasActiveAudience = true;
 
-        while (this.fetched == true) {
-            speaker.wake();
-            audience.sleep();
-        }
+        speaker.wake();
+        pair.sleep();
+        int ret = word;
+        pair.wake();
 
-        int ret = this.word;
-        this.fetched = true;
-        speaker.wakeAll();
-
-        numAudience -= 1;
         hasActiveAudience = false;
-        audience.wake();
+        if (waitAudiences > 0)
+            audience.wake();
         sharedLock.release();
         return ret;
     }
@@ -92,26 +85,30 @@ public class Communicator {
 
     int word;
 
-    int numSpeaker;
-    boolean hasActiveSpeaker;
-    int numAudience;
-    boolean hasActiveAudience;
-
-    boolean fetched = true;
+    boolean hasActiveSpeaker = false;
+    boolean hasActiveAudience = false;
+    int waitSpeakers = 0;
+    int waitAudiences = 0;
 
     private Lock sharedLock = new Lock();
     private Condition speaker = new Condition(sharedLock);
     private Condition audience = new Condition(sharedLock);
+    private Condition pair = new Condition(sharedLock);
 }
 
 class CommunicatorTest {
     static final int SPEAK = 0;
     static final int LISTEN = 1;
 
-    static int numClients = 3;
-    static int numClientLoop = 4;
+    static Random random = new Random();
+    static int numClients = 20;
+    static int numClientLoop = 1000;
+    static int terminated = 0;
     static int leftBits = numClients * numClientLoop;
     static int leftOnes = leftBits / 2;
+
+    static Lock lock = new Lock();
+    static Condition terminate = new Condition(lock);
 
     static int[] status;
     static int[] remaining;
@@ -119,60 +116,73 @@ class CommunicatorTest {
     /**
      * Given current state, determine whether deadlock will happen.
      */
-    static boolean willDeadlock(int[] oldStatus, int[] remaining) {
-        int[] status = oldStatus.clone();
-        int freeClient = 0;
-        for (int i = 0; i < numClients; ++i)
-            if (status[i] == 0)
-                freeClient += remaining[i];
+//    static boolean willDeadlock(int[] oldStatus, int[] remaining) {
+//        int[] status = oldStatus.clone();
+//        int freeClient = 0;
+//        for (int i = 0; i < numClients; ++i)
+//            if (status[i] == 0)
+//                freeClient += remaining[i];
+//
+//        LinkedList<Integer> speakers = new LinkedList<>(), audiences = new LinkedList<>();
+//        while (true) {
+//            int maxId = -1;
+//            for (int i = 0; i < numClients; ++i)
+//                if (status[i] != 0 && (maxId == -1 || remaining[i] > remaining[maxId]))
+//                    maxId = i;
+//            if (maxId == -1) { // no client is allocating resources
+//                break;
+//            } else {
+//                if (status[maxId] < 0) { // listening
+//                    if (!speakers.isEmpty()) {
+//                        int speaker = speakers.poll();
+//                        freeClient += remaining[speaker];
+//                        freeClient += remaining[maxId];
+//                    } else {
+//                        audiences.push(maxId);
+//                    }
+//                } else {
+//                    if (!audiences.isEmpty()) {
+//                        int audience = audiences.poll();
+//                        freeClient += remaining[audience];
+//                        freeClient += remaining[maxId];
+//                    } else {
+//                        speakers.push(maxId);
+//                    }
+//                }
+//
+//                status[maxId] = 0;
+//            }
+//        }
+//
+//        while (!speakers.isEmpty()) {
+//            if (freeClient == 0)
+//                return true;
+//            int speaker = speakers.poll();
+//            freeClient -= 1;
+//            freeClient += remaining[speaker];
+//        }
+//
+//        while (!audiences.isEmpty()) {
+//            if (freeClient == 0)
+//                return true;
+//            int audience = audiences.poll();
+//            freeClient -= 1;
+//            freeClient += remaining[audience];
+//        }
+//
+//        return false;
+//    }
 
-        LinkedList<Integer> speakers = new LinkedList<>(), audiences = new LinkedList<>();
-        while (true) {
-            int maxId = -1;
-            for (int i = 0; i < numClients; ++i)
-                if (status[i] != 0 && (maxId == -1 || remaining[i] > remaining[maxId]))
-                    maxId = i;
-            if (maxId == -1) { // no client is allocating resources
-                break;
-            } else {
-                if (status[maxId] < 0) { // listening
-                    if (!speakers.isEmpty()) {
-                        int speaker = speakers.poll();
-                        freeClient += remaining[speaker];
-                        freeClient += remaining[maxId];
-                    } else {
-                        audiences.push(maxId);
-                    }
-                } else {
-                    if (!audiences.isEmpty()) {
-                        int audience = audiences.poll();
-                        freeClient += remaining[audience];
-                        freeClient += remaining[maxId];
-                    } else {
-                        speakers.push(maxId);
-                    }
-                }
-
-                status[maxId] = 0;
+    static boolean isDeadlock() {
+        int listening = 0, speaking = 0;
+        for (int i = 0; i < numClients; ++i) {
+            if (status[i] < 0) {
+                listening += 1;
+            } else if (status[i] > 0) {
+                speaking += 1;
             }
         }
-
-        while (!speakers.isEmpty()) {
-            if (freeClient == 0)
-                return true;
-            int speaker = speakers.poll();
-            freeClient -= 1;
-            freeClient += remaining[speaker];
-        }
-
-        while (!audiences.isEmpty()) {
-            if (freeClient == 0)
-                return true;
-            int audience = audiences.poll();
-            freeClient -= 1;
-            freeClient += remaining[audience];
-        }
-        return false;
+        return listening == numClients - terminated || speaking == numClients - terminated;
     }
 
     /**
@@ -181,25 +191,38 @@ class CommunicatorTest {
      * There must be at least one client speaking or listening.
      */
     static int nextState(int id) {
-        double random = Math.random();
-        int initBit = (int) (random * leftBits / (leftOnes + 1e-5));
-        for (int i = 0; i < 2; ++i) {
-            int currentBit = initBit ^ i;
-            if (currentBit == 0) {
-                int x = (int) (Math.random() * 1e9) + 1;
-                status[id] = x;
-                if (!willDeadlock(status, remaining)) {
-                    return x;
-                }
-            } else {
-                status[id] = -1;
-                if (!willDeadlock(status, remaining)) {
-                    return -1;
-                }
-            }
+        double r = random.nextDouble();
+        int initBit = (int) (r * leftBits / (leftOnes + 1e-5));
+        if (initBit == 0) {
+            int x = (int) (random.nextDouble() * 1e9) + 1;
+            status[id] = x;
+            return x;
+        } else {
+            status[id] = -1;
+            return -1;
         }
-        Lib.assertTrue(false);
-        return -1;
+//        for (int i = 0; i < 2; ++i) {
+//            int currentBit = initBit ^ i;
+//            if (currentBit == 0) {
+//                int x = (int) (Math.random() * 1e9) + 1;
+//                status[id] = x;
+//                if (!willDeadlock(status, remaining)) {
+//                    return x;
+//                }
+//            } else {
+//                status[id] = -1;
+//                if (!willDeadlock(status, remaining)) {
+//                    return -1;
+//                }
+//            }
+//        }
+//        Lib.debug('x', String.format("id: %d", id));
+//        status[id] = 0;
+//        for (int i = 0; i < numClients; ++i) {
+//            Lib.debug('x', String.format("s/r: %d %d", status[i], remaining[i]));
+//        }
+//        Lib.assertTrue(false);
+//        return -1;
     }
 
     private static class PingPong implements Runnable {
@@ -212,20 +235,25 @@ class CommunicatorTest {
         }
 
         void report(int method, int answer) {
+            StringBuffer stringBuffer = new StringBuffer();
+            for (int i = 0; i < numClients; ++i) {
+                stringBuffer.append(String.format("%9d ", status[i]));
+            }
+            String stat = stringBuffer.toString();
+
             if (method == SPEAK) {
-                Lib.debug('x',  String.format("@%d Speaking %09d", id, answer));
+                Lib.debug('x',  String.format("@%d Speaking %09d        [%s]", id, answer, stat));
             } else {
                 int found = -1;
                 for (int i = 0; i < numClients; ++i) {
                     if (status[i] == answer) {
                         found = i;
-                        status[i] = 0;
+//                        status[i] = 0;
                         break;
                     }
                 }
-                Lib.assertTrue(found >= 0);
-
-                Lib.debug('x', String.format("@%d Listened %09d from %d", id, answer, found));
+                Lib.debug('x', String.format("@%d Listened %09d from %d [%s]", id, answer, found, stat));
+//                Lib.assertTrue(found >= 0);
             }
         }
 
@@ -233,19 +261,36 @@ class CommunicatorTest {
             for (int i = 0; i < numClientLoop; ++i) { // randomly speaking or listening
                 remaining[id] -= 1;
                 int decide = nextState(id);
+                if (isDeadlock()) {
+                    Lib.debug('x', "Deadlocking");
+                    lock.acquire();
+                    terminate.wake();
+                    lock.release();
+                    return;
+                }
                 if (decide > 0) {
+                    status[id] = decide;
                     report(SPEAK, decide);
                     communicator.speak(decide);
+                    status[id] = 0;
                 } else {
-                    Lib.debug('x', String.format("> @%d: listen", id));
+//                    Lib.debug('x', String.format("> @%d: listen", id));
+                    status[id] = -1;
                     int y = communicator.listen();
                     report(LISTEN, y);
+                    status[id] = 0;
                 }
             }
+            terminated += 1;
         }
     }
 
     public static void selfTest() {
+
+        long seed = random.nextLong();
+//         long seed = -4047517733952003518l;
+        random.setSeed(seed);
+        Lib.debug('x', String.format("seed = %d", seed));
         status = new int[numClients];
         remaining = new int[numClients];
         for (int i = 0; i < numClients; ++i)
@@ -254,11 +299,13 @@ class CommunicatorTest {
         Lib.debug('t', "Self test for Communicator");
 
         Communicator communicator = new Communicator();
-        for (int i = 1; i < numClients; ++i) {
+        for (int i = 0; i < numClients; ++i) {
             new KThread(new PingPong(communicator, i)).setName("child" + Integer.toString(i)).fork();
         }
 
-        new PingPong(communicator, 0).run();
+        lock.acquire();
+        terminate.sleep();
+        lock.release();
     }
 
 }

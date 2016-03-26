@@ -84,7 +84,8 @@ public class Condition {
 
 	conditionLock.release();
 	waiter.P();
-	conditionLock.acquire();	
+	conditionLock.acquire();
+        Lib.debug('C', String.format("Process %s wakes up.", KThread.currentThread().getName()));
     }
 
     /**
