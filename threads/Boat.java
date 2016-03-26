@@ -9,7 +9,7 @@ public class Boat {
     public static void selfTest() {
         BoatGrader b = new BoatGrader();
 
-        int adults = 5, children = 4;
+        int adults = 10, children = 10;
 
 //        System.out.println("\n ***Testing Boats with only 2 children***");
 //        begin(0, 5, b);
@@ -51,8 +51,7 @@ public class Boat {
 
         while (true) {
             if (communicator.listen() == adults + children) {
-//                finishedTravel = true;
-//                molokai.wake();
+                finishedTravel = true;
                 break;
             }
         }
@@ -73,7 +72,8 @@ public class Boat {
 
         int currentLocation = OAHU;
 
-        lockInfoOahu.acquire();
+//        lockInfoOahu.acquire();
+        globalLock.acquire();
         numAdultOahu += 1;
         oahu.wake();
         oahu.sleep();
@@ -85,12 +85,13 @@ public class Boat {
                     numAdultOahu -= 1;
                     bg.AdultRideToMolokai(); // arrival
                     numAdultMolokai += 1;
-                    lockInfoOahu.release();
+//                    lockInfoOahu.release();
 
                     boatLocation = MOLOKAI;
-                    lockInfoMolokai.acquire();
+//                    lockInfoMolokai.acquire();
                     molokai.wakeAll();
-                    lockInfoMolokai.release();
+//                    lockInfoMolokai.release();
+                    globalLock.release();
 
                     break;
                 } else {
@@ -111,7 +112,8 @@ public class Boat {
 
         int currentLocation = OAHU;
 
-        lockInfoOahu.acquire();
+//        lockInfoOahu.acquire();
+        globalLock.acquire();
         numChildOahu += 1;
         oahu.wakeAll();
         oahu.sleep();
@@ -125,10 +127,10 @@ public class Boat {
                         numChildOahu -= 1;
                         numChildMolokai += 1;
                         oahu.wakeAll();
-                        lockInfoOahu.release();
+//                        lockInfoMolokai.acquire();
+//                        lockInfoOahu.release();
 
                         currentLocation = MOLOKAI;
-                        lockInfoMolokai.acquire();
                         molokai.sleep();
                         boatSeats = 2;
                         boatLocation = MOLOKAI;
@@ -139,26 +141,40 @@ public class Boat {
                         numChildMolokai += 1;
                         numChildOahu -= 1;
                         currentLocation = MOLOKAI;
-                        lockInfoOahu.release();
+//                        lockInfoOahu.release();
 
-                        lockInfoMolokai.acquire();
+//                        lockInfoMolokai.acquire();
                         molokai.wakeAll();
                         molokai.sleep();
                     } else {
-//                        oahu.wakeAll();
+                        /**
+                         * Must wake now.
+                         * If an adult comes at last, we must wake it up.
+                         */
+                        oahu.wakeAll();
                         oahu.sleep();
                     }
                 } else {
-//                    oahu.wakeAll();
+                    oahu.wakeAll();
                     oahu.sleep();
                 }
             } else {
+                /**
+                 * The reason we release the lock here is that
+                 * when we talk to God, the adult can come in can then
+                 * requires the lockInfoMolokai. But it cannot get it
+                 * therefore the adult process will be interrupted.
+                 */
+//                lockInfoMolokai.release();
+                globalLock.release();
                 communicator.speak(numAdultMolokai + numChildMolokai);
 //                molokai.sleep();
                 if (finishedTravel) {
                     break;
                 }
 
+//                lockInfoMolokai.acquire();
+                globalLock.acquire();
                 Lib.debug('t', "boatLocation = " + Integer.toString(boatLocation));
                 if (boatLocation == MOLOKAI) {
                     bg.ChildRideToOahu();
@@ -166,9 +182,9 @@ public class Boat {
                     numChildOahu += 1;
                     numChildMolokai -= 1;
                     boatLocation = OAHU;
-                    lockInfoMolokai.release();
+//                    lockInfoMolokai.release();
 
-                    lockInfoOahu.acquire();
+//                    lockInfoOahu.acquire();
                     oahu.wakeAll();
                     oahu.sleep();
                 } else {
@@ -195,6 +211,7 @@ public class Boat {
     public static final int MOLOKAI = 2;
     public static final int SEA = 3;
 
+    static Lock globalLock = new Lock();
     static Lock lockInfoOahu = new Lock();
     static Lock lockInfoMolokai = new Lock();
 
@@ -205,8 +222,8 @@ public class Boat {
 
     static boolean finishedTravel = false;
 
-    static Condition oahu = new Condition(lockInfoOahu);
-    static Condition molokai = new Condition(lockInfoMolokai);
+    static Condition oahu = new Condition(globalLock);
+    static Condition molokai = new Condition(globalLock);
 
     static int boatLocation = OAHU;
     static int boatSeats = 2;

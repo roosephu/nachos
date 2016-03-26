@@ -36,7 +36,6 @@ public class Condition2 {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
         Lock waiter = new Lock();
-	conditionLock.release();
 
         /**
          * The idea is that: the lock is initialized to non-empty, and the process
@@ -45,10 +44,10 @@ public class Condition2 {
          */
         waiter.acquire();
         lockList.add(waiter);
+        conditionLock.release();
         waiter.acquire();
+        conditionLock.acquire();
         waiter.release();
-
-	conditionLock.acquire();
     }
 
     /**
