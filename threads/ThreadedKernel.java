@@ -3,6 +3,9 @@ package nachos.threads;
 import nachos.ag.BoatGrader;
 import nachos.machine.*;
 
+import java.util.Random;
+import java.util.StringJoiner;
+
 /**
  * A multi-threaded OS kernel.
  */
@@ -47,9 +50,14 @@ public class ThreadedKernel extends Kernel {
      * tests here.
      */
     public void selfTest() {
-        Alarm.selfTest();
+//        long seed = random.nextLong();
+        long seed = 6836154031344819769l;
+        random.setSeed(seed);
+        Lib.debug('X', String.format("Random seed = %d", seed));
+
+//        Alarm.selfTest();
 //        CommunicatorTest.selfTest();
-//        Boat.selfTest();
+        Boat.selfTest();
 //        KThread.selfTest();
 //        Semaphore.selfTest();
 //        SynchList.selfTest();
@@ -93,4 +101,6 @@ public class ThreadedKernel extends Kernel {
     private static Communicator dummy5 = null;
     private static Rider dummy6 = null;
     private static ElevatorController dummy7 = null;
+
+    public static Random random = new Random();
 }

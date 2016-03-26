@@ -100,7 +100,7 @@ class CommunicatorTest {
     static final int SPEAK = 0;
     static final int LISTEN = 1;
 
-    static Random random = new Random();
+    static Random random = ThreadedKernel.random;
     static int numClients = 20;
     static int numClientLoop = 1000;
     static int terminated = 0;

@@ -9,7 +9,7 @@ public class Boat {
     public static void selfTest() {
         BoatGrader b = new BoatGrader();
 
-        int adults = 0, children = 4;
+        int adults = 5, children = 4;
 
 //        System.out.println("\n ***Testing Boats with only 2 children***");
 //        begin(0, 5, b);

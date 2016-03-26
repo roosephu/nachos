@@ -69,7 +69,7 @@ public class LotteryScheduler extends PriorityScheduler {
             if (waitQueue.isEmpty())
                 return null;
 
-            int random = (int) (Math.random() * waitQueue.size());
+            int random = ThreadedKernel.random.nextInt(waitQueue.size());
             KThread thread = waitQueue.get(random);
             waitQueue.remove(thread);
             return thread;
