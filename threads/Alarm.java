@@ -66,7 +66,7 @@ public class Alarm {
 
         while (!waitQueue.isEmpty()) {
             PriorThread priorThread = waitQueue.peek();
-            if (priorThread.priority > currentTime) { /** we are ready! */
+            if (priorThread.priority <= currentTime) { /** we are ready! */
                 waitQueue.poll();
                 priorThread.thread.ready();
             } else {  /** don't need to see other processes */
@@ -111,4 +111,29 @@ public class Alarm {
     }
 
     private PriorityQueue<PriorThread> waitQueue = new PriorityQueue(new PriorThread.Comp());
+
+    static class Timer implements Runnable {
+        long t;
+        Timer(long x) {
+            t = x;
+        }
+
+        @Override
+        public void run() {
+            long currentTime = Machine.timer().getTime();
+            long expect = currentTime + t;
+            Lib.debug('A', String.format("time before alarm: %d, expect: %d", currentTime, expect));
+            ThreadedKernel.alarm.waitUntil(t);
+            currentTime = Machine.timer().getTime();
+            Lib.debug('A', String.format("time after  alarm: %d, expect: %d", currentTime, expect));
+        }
+    }
+
+    static public void selfTest() {
+        new KThread(new Timer(1000)).fork();
+        new KThread(new Timer(2000)).fork();
+
+        ThreadedKernel.alarm.waitUntil(10000);
+        Lib.debug('A', String.format("time after alarm: %d", Machine.timer().getTime()));
+    }
 }
