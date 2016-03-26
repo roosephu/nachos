@@ -1,6 +1,7 @@
 package nachos.threads;
 
 import nachos.ag.BoatGrader;
+import nachos.machine.Lib;
 
 public class Boat {
     static BoatGrader bg;
@@ -8,7 +9,7 @@ public class Boat {
     public static void selfTest() {
         BoatGrader b = new BoatGrader();
 
-        int adults = 10, children = 10;
+        int adults = 5, children = 4;
 
 //        System.out.println("\n ***Testing Boats with only 2 children***");
 //        begin(0, 5, b);
@@ -93,7 +94,7 @@ public class Boat {
 
                     break;
                 } else {
-                    oahu.wake();
+                    oahu.wakeAll();
                     oahu.sleep();
                 }
             } else { // Molokai
@@ -112,7 +113,7 @@ public class Boat {
 
         lockInfoOahu.acquire();
         numChildOahu += 1;
-        oahu.wake();
+        oahu.wakeAll();
         oahu.sleep();
 
         while (true) {
@@ -131,6 +132,7 @@ public class Boat {
                         molokai.sleep();
                         boatSeats = 2;
                         boatLocation = MOLOKAI;
+                        molokai.wakeAll();
                     } else if (boatSeats == 1) {
                         boatSeats = 0;
                         bg.ChildRideToMolokai();
@@ -143,11 +145,11 @@ public class Boat {
                         molokai.wakeAll();
                         molokai.sleep();
                     } else {
-                        oahu.wake();
+//                        oahu.wakeAll();
                         oahu.sleep();
                     }
                 } else {
-                    oahu.wake();
+//                    oahu.wakeAll();
                     oahu.sleep();
                 }
             } else {
@@ -157,16 +159,17 @@ public class Boat {
                     break;
                 }
 
+                Lib.debug('t', "boatLocation = " + Integer.toString(boatLocation));
                 if (boatLocation == MOLOKAI) {
-                    lockInfoMolokai.release();
                     bg.ChildRideToOahu();
                     currentLocation = OAHU;
                     numChildOahu += 1;
                     numChildMolokai -= 1;
                     boatLocation = OAHU;
+                    lockInfoMolokai.release();
 
                     lockInfoOahu.acquire();
-                    oahu.wake();
+                    oahu.wakeAll();
                     oahu.sleep();
                 } else {
                     molokai.wake();

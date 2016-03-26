@@ -76,5 +76,5 @@ public class Condition2 {
     }
 
     private Lock conditionLock;
-    private LinkedList<Lock> lockList;
+    private LinkedList<Lock> lockList = new LinkedList<>();
 }
