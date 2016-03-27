@@ -50,6 +50,7 @@ public class ThreadedKernel extends Kernel {
      * tests here.
      */
     public void selfTest() {
+    	Test.selfTest();
         long seed;
 //        seed = random.nextLong();
 //        seed = 6836154031344819769l;
