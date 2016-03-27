@@ -120,6 +120,7 @@ public class Test {
 					}
 					if(milk.num == 0) {
 						milk.num ++;
+						System.out.println("Buy "+i+"th milk.");
 						condition.wake();		
 					}
 					lock.release();
@@ -135,6 +136,7 @@ public class Test {
 						condition.sleep();
 					}
 					milk.num--;
+					System.out.println("Drink "+i+"th milk.");
 					Lib.debug('t',"In Condition2 test: drink a milk");
 					lock.release();
 				}
