@@ -63,11 +63,9 @@ public class Alarm {
          */
     	boolean initStatus = Machine.interrupt().disable();
     	
-        long currentTime = Machine.timer().getTime();
-
         while (!waitQueue.isEmpty()) {
             PriorThread priorThread = waitQueue.peek();
-            if (priorThread.priority > currentTime) { /** we are ready! */
+            if (priorThread.priority <= Machine.timer().getTime()) { /** we are ready! */
                 waitQueue.poll();
                // System.out.println("poll from alarm waitqueue\n");
                 priorThread.thread.ready();
