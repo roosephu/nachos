@@ -102,7 +102,7 @@ public class Test {
 	//test by milk buying
 	
     static class Milk {
-    	public volatile int num = 0;
+    	public int num = 0;
     }
     
 	public static void selfTestCondition2(){
@@ -118,12 +118,11 @@ public class Test {
 					while (milk.num != 0){
 						condition.sleep();
 					}
-					if(milk.num == 0) {
-						milk.num ++;
-						System.out.println("Buy "+i+"th milk.");
-						condition.wake();		
-					}
+					milk.num ++;
+					System.out.println("Buy "+i+"th milk.");
+					condition.wake();		
 					lock.release();
+					//KThread.currentThread().yield();
 				}
 			}
 		});
@@ -133,12 +132,15 @@ public class Test {
 				for (int i=0;i<10;i++){
 					lock.acquire();
 					while (milk.num == 0){
+						condition.wake();	
 						condition.sleep();
 					}
 					milk.num--;
 					System.out.println("Drink "+i+"th milk.");
 					Lib.debug('t',"In Condition2 test: drink a milk");
+					//
 					lock.release();
+					//KThread.currentThread().yield();
 				}
 			}
 		};
@@ -148,4 +150,5 @@ public class Test {
 		t1.join();
 		t2.join();
 	}
+	
 }
