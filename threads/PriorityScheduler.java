@@ -137,7 +137,7 @@ public class PriorityScheduler extends Scheduler {
             priorityQueue.add(threadState);
 
             // must run after priorityQueue.add
-            // otherwise updateEffectivePriority can add it twice.
+            // otherwise updateEffectivePriority can add it twice (first deletion fails)
             threadState.waitForAccess(this);
         }
 
@@ -151,6 +151,8 @@ public class PriorityScheduler extends Scheduler {
         public KThread nextThread() {
             Lib.debug('p', "Did you called me?");
             Lib.assertTrue(Machine.interrupt().disabled());
+
+            // The owned thread has finished everything it wants, so he is releasing resources.
             if (ownedThread != null) {
                 ownedThread.removeWaitingQueue(this);
             }
@@ -267,9 +269,15 @@ public class PriorityScheduler extends Scheduler {
         public void updateEffectivePriority() {
             boolean intStatus = Machine.interrupt().disable();
 
+            /**
+             * The effective priority may change, so first we need to delete it from the
+             * priority queue and after computing its new effective priority, we add it
+             * back to the priority queue again.
+             */
             if (waitingFor != null)
                 Lib.assertTrue(waitingFor.priorityQueue.remove(this));
 
+            // Computing new effective priority
             effectivePriority = priority;
             for (PriorityQueue queue : resourceList) {
                 if (queue.transferPriority) {
@@ -283,8 +291,11 @@ public class PriorityScheduler extends Scheduler {
 
             if (waitingFor != null) {
                 waitingFor.priorityQueue.add(this);
+                // waitingFor.ownedThread may be null (ready queue)
                 if (waitingFor.ownedThread != null && waitingFor.transferPriority) {
                     Lib.assertTrue(waitingFor.ownedThread != this);
+
+                    // Note that current thread is donating priority to another priority.
                     waitingFor.ownedThread.updateEffectivePriority();
                 }
             }
@@ -325,10 +336,11 @@ public class PriorityScheduler extends Scheduler {
             Lib.assertTrue(waitingFor == null);
 
             // may happen, e.g., ready queue
-            // Lib.assertTrue(waitQueue.ownedThread != this);
+//             Lib.assertTrue(waitQueue.ownedThread != this);
 
+            // I'm waiting for some resource, thus I must donate my priority to the owner.
             waitingFor = waitQueue;
-            if (waitingFor != null && waitingFor.ownedThread != null)
+            if (waitingFor != null && waitingFor.ownedThread != null) // and then update its effective priority
                 waitingFor.ownedThread.updateEffectivePriority();
 //            setInvalid();
         }
@@ -365,6 +377,11 @@ public class PriorityScheduler extends Scheduler {
              */
 //            Lib.assertTrue(waitingFor == waitQueue);
 
+            /**
+             * I've gotten the resource, therefore I'm waiting for nothing (at least
+             * for now). And all the threads waiting for this resource must donate
+             * their priority to me.
+             */
             waitingFor = null;
             resourceList.add(waitQueue); // I will own the queue soon
 

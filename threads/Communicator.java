@@ -32,6 +32,7 @@ public class Communicator {
     public void speak(int word) {
         sharedLock.acquire(); // acquire the lock so that no speakers or audience can enter
 
+        // We force the speaker to wait until an audience comes.
         waitSpeakers += 1;
         while (!hasActiveAudience || hasActiveSpeaker) {
             speaker.sleep();
@@ -66,12 +67,12 @@ public class Communicator {
         hasActiveAudience = true;
 
         speaker.wake();
-        pair.sleep();
+        pair.sleep(); // The audience is waiting for a speaker to wake it up.
         int ret = word;
         pair.wake();
 
         hasActiveAudience = false;
-        if (waitAudiences > 0)
+        if (waitAudiences > 0) // A new audience may come, wake it up.
             audience.wake();
         sharedLock.release();
         return ret;
