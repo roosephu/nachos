@@ -5,7 +5,7 @@ import nachos.machine.Lib;
 public class Test {
 
     public static void selfTest() {
-//        selfTestJoin();
+  //      selfTestJoin();
 //        selfTestAlarm();
         selfTestCondition2();
     }
@@ -109,24 +109,24 @@ public class Test {
         final Lock lock = new Lock();
         final Condition2 condition = new Condition2(lock);
         final Milk milk = new Milk();
-        KThread t1 = new KThread(new Runnable() {
+        Runnable buyer = new Runnable() {
             @Override
             public void run() {
-                for (int i = 0; i < 10; i++) {
+                for (int i = 0; i < 30; i++) {
                     lock.acquire();
                     Lib.debug('t', "In Condition2 test: try to buy milk");
                     while (milk.num != 0) {
+                    	condition.wakeAll();
                         condition.sleep();
                     }
-                    if (milk.num == 0) {
-                        milk.num++;
-                        condition.wake();
-                    }
+                    milk.num++;
+                    System.out.println("Buy "+i+"th milk");
                     lock.release();
                 }
             }
-        });
-        Runnable r_drinker = new Runnable() {
+        };
+        KThread t1 = new KThread(buyer);
+        Runnable drinker = new Runnable() {
             @Override
             public void run() {
                 for (int i = 0; i < 10; i++) {
@@ -137,14 +137,21 @@ public class Test {
                     }
                     milk.num--;
                     Lib.debug('t', "In Condition2 test: drink a milk");
+                    System.out.println("Drink "+i+"th milk");
                     lock.release();
                 }
             }
         };
-        KThread t2 = new KThread(r_drinker);
+        KThread t2 = new KThread(drinker);
+        KThread t3 = new KThread(drinker);
+        KThread t4 = new KThread(drinker);
         t1.fork();
         t2.fork();
+        t3.fork();
+        t4.fork();
         t1.join();
         t2.join();
+        t3.join();
+        t4.join();
     }
 }
