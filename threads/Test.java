@@ -112,7 +112,7 @@ public class Test {
         Runnable buyer = new Runnable() {
             @Override
             public void run() {
-                for (int i = 0; i < 30; i++) {
+                for (int i = 0; i < 300; i++) {
                     lock.acquire();
                     Lib.debug('t', "In Condition2 test: try to buy milk");
                     while (milk.num != 0) {
@@ -120,6 +120,7 @@ public class Test {
                         condition.sleep();
                     }
                     milk.num++;
+                    condition.wake();
                     System.out.println("Buy "+i+"th milk");
                     lock.release();
                 }
@@ -129,7 +130,7 @@ public class Test {
         Runnable drinker = new Runnable() {
             @Override
             public void run() {
-                for (int i = 0; i < 10; i++) {
+                for (int i = 0; i < 100; i++) {
                     lock.acquire();
                     while (milk.num == 0) {
                         condition.wake();

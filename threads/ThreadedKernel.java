@@ -50,16 +50,15 @@ public class ThreadedKernel extends Kernel {
      * tests here.
      */
     public void selfTest() {
-    	Test.selfTest();
         long seed;
-//        seed = random.nextLong();
+        seed = random.nextLong();
 //        seed = 6836154031344819769l;
 //        seed = 6543525100317173545l;
 //        seed = 4909084219636744825l;
 //        seed = -1858323208807266227l; // 10, 10
 //        seed = -2014348969010379264l; // 2, 2
 //        seed = -108121132699258408l; // 1, 2
-        seed = 8383159614660730322l; // for Cond2 test
+//        seed = 8383159614660730322l; // for Cond2 test
 
         random.setSeed(seed);
         System.err.printf("Random seed = %d\n", seed);

@@ -17,7 +17,7 @@ public class Boat {
 //	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
 //  	begin(1, 2, b);
 
-  	System.out.println("\n ***Testing Boats with " + Integer.toString(children) + " children, " + Integer.toString(adults) + " adults***");
+        System.out.printf("\n ***Testing Boats with %d children, %d adults***", children, adults);
   	begin(adults, children, b);
     }
 
@@ -30,6 +30,8 @@ public class Boat {
 
         // Create threads here. See section 3.4 of the Nachos for Java
         // Walkthrough linked from the projects page.
+        numAdultOahu = adults;
+        numChildOahu = children;
 
         for (int i = 1; i <= adults; ++i) {
             KThread t = new KThread(new Runnable() {
@@ -74,14 +76,14 @@ public class Boat {
 
 //        lockInfoOahu.acquire();
         globalLock.acquire();
-        numAdultOahu += 1;
+//        numAdultOahu += 1;
         oahu.wake();
         oahu.sleep();
 
 //        lockBoat.acquire();
         while (true) {
             if (currentLocation == OAHU) { // Oahu
-                if (numChildMolokai > 0 && boatLocation == OAHU && boatSeats == 2) {
+                if (numChildOahu < 2 && boatLocation == OAHU && boatSeats == 2) {
                     numAdultOahu -= 1;
                     bg.AdultRideToMolokai(); // arrival
                     numAdultMolokai += 1;
@@ -114,7 +116,7 @@ public class Boat {
 
 //        lockInfoOahu.acquire();
         globalLock.acquire();
-        numChildOahu += 1;
+//        numChildOahu += 1;
         oahu.wakeAll();
         oahu.sleep();
 
