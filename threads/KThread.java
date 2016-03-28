@@ -426,7 +426,7 @@ public class KThread {
         // new KThread(new PingTest(3)).setName("forked thread 2").fork();
         new PingTest(0).run();
     }
-
+    
     private static final char dbgThread = 't';
 
     /**

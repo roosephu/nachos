@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import javax.crypto.Mac;
 import java.util.LinkedList;
 
 /**
@@ -24,6 +25,8 @@ public class Condition2 {
      */
     public Condition2(Lock conditionLock) {
 	this.conditionLock = conditionLock;
+
+        this.waitQueue = ThreadedKernel.scheduler.newThreadQueue(false);
     }
 
     /**
@@ -35,19 +38,15 @@ public class Condition2 {
     public void sleep() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
-        Lock waiter = new Lock();
+        boolean intStatus = Machine.interrupt().disable();
 
-        /**
-         * The idea is that: the lock is initialized to non-empty, and the process
-         * keeps acquiring it. If one process call wake(), it will release the lock
-         * in the head of the queue, and the corresponding process is waken up.
-         */
-        waiter.acquire();
-        lockList.add(waiter);
+        KThread currentThread = KThread.currentThread();
+        waitQueue.waitForAccess(currentThread);
         conditionLock.release();
-        waiter.acquire();
+        currentThread.sleep();
         conditionLock.acquire();
-        waiter.release();
+
+        Machine.interrupt().restore(intStatus);
     }
 
     /**
@@ -57,9 +56,11 @@ public class Condition2 {
     public void wake() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
-        if (!lockList.isEmpty()) {
-            lockList.removeFirst().release();
-        }
+        boolean intStatus = Machine.interrupt().disable();
+        KThread thread = waitQueue.nextThread();
+        if (thread != null)
+            thread.ready();
+        Machine.interrupt().restore(intStatus);
     }
 
     /**
@@ -69,11 +70,13 @@ public class Condition2 {
     public void wakeAll() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
-        while (!lockList.isEmpty()) {
-            wake();
+        KThread thread = waitQueue.nextThread();
+        while (thread != null) {
+            thread.ready();
+            thread = waitQueue.nextThread();
         }
     }
 
     private Lock conditionLock;
-    private LinkedList<Lock> lockList = new LinkedList<>();
+    private ThreadQueue waitQueue;
 }
