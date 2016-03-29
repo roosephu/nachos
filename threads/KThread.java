@@ -287,9 +287,7 @@ public class KThread {
             waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
             waitQueue.acquire(this);
         }
-        if (status == statusFinished)
-            return;
-        else {
+        if (status != statusFinished) {
             waitQueue.waitForAccess(currentThread);
             currentThread.sleep();
         }
