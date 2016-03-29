@@ -217,7 +217,7 @@ public class PriorityScheduler extends Scheduler {
          * threads to the owning thread.
          */
         public boolean transferPriority;
-        public ThreadState ownedThread;
+        public ThreadState ownedThread = null;
 
         public java.util.PriorityQueue<ThreadState> priorityQueue = new java.util.PriorityQueue<>(new Comp());
     }
@@ -476,6 +476,7 @@ class InstructionsGenerator {
             if (currentPid == pid || (pid < 0 && currentPid != 0)) {
                 this.currentPid = currentPid;
                 Lib.debug('z', String.format("[%d] PC %d on proc %d: %s", Machine.timer().getTime(), this.pc, currentPid, self));
+                Lib.assertTrue(this.pc == Machine.timer().getTime() / oneSecond);
                 runnable.run();
             }
             return report;
@@ -488,8 +489,8 @@ class InstructionsGenerator {
     }
 
     static final int numClients = 100;
-    static final int numLocks = 50;
-    static final long oneSecond = 1000000;
+    static final int numLocks = 5;
+    static final long oneSecond = 10000;
 
     Random random = ThreadedKernel.random;
     Lock[] locks = new Lock[numLocks + 1];
