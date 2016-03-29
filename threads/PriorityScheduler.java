@@ -61,6 +61,7 @@ public class PriorityScheduler extends Scheduler {
         Lib.assertTrue(priority >= priorityMinimum &&
                 priority <= priorityMaximum);
 
+        Lib.debug('x', thread.getName() + " old: " + ThreadedKernel.scheduler.getPriority(thread) + " new: " + priority);
         getThreadState(thread).setPriority(priority);
     }
 
