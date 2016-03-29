@@ -26,7 +26,7 @@ public class Condition2 {
     public Condition2(Lock conditionLock) {
         this.conditionLock = conditionLock;
 
-        this.waitQueue = ThreadedKernel.scheduler.newThreadQueue(false);
+        this.waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
     }
 
     /**

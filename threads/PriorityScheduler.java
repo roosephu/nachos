@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -411,32 +412,38 @@ class InstructionsGenerator {
 
     public class Operation {
         int pid;
+        int pc;
+        int currentPid;
         Runnable runnable;
         boolean report = false;
+        String self;
 
         Operation(int pid) {
             this.pid = pid;
+            this.pc = programCounter;
+            programCounter += 1;
         }
 
-        Operation acquire(Lock lock) {
+        Operation acquire(int lock) {
             runnable = new Runnable() {
                 @Override
                 public void run() {
-                    acquireTime[pid] = Machine.timer().getTime();
-                    lock.acquire();
+                    acquireTime[currentPid] = Machine.timer().getTime();
+                    locks[lock].acquire();
                 }
             };
+            self = String.format("process %d acquires lock %d", pid, lock);
             return this;
         }
 
-        Operation release(Lock lock) {
+        Operation release(int lock) {
             runnable = new Runnable() {
                 @Override
                 public void run() {
-                    if (lock.isHeldByCurrentThread())
-                        lock.release();
+                    locks[lock].release();
                 }
             };
+            self = String.format("process %d releases lock %d", pid, lock);
             return this;
         }
 
@@ -446,31 +453,51 @@ class InstructionsGenerator {
         }
 
         Operation setPriority(int id, int priority) {
+            runnable = new Runnable() {
+                @Override
+                public void run() {
+                    boolean intStatus = Machine.interrupt().disable();
+                    ThreadedKernel.scheduler.setPriority(priority);
+                    Machine.interrupt().restore(intStatus);
+                }
+            };
+            self = String.format("process %d is set priority to %d", pid, priority);
             return this;
         }
 
         public boolean run(boolean shouldReport, int currentPid) {
-            if (shouldReport) {
+            if (shouldReport && currentPid != 0) {
                 threadReport(currentPid);
             }
             if (currentPid == pid || (pid < 0 && currentPid != 0)) {
+                this.currentPid = currentPid;
+                Lib.debug('z', String.format("PC %d on proc %d: %s", this.pc, currentPid, self));
                 runnable.run();
             }
             return report;
         }
+
+        @Override
+        public String toString() {
+            return self;
+        }
     }
 
-    static final int numClients = 10;
-    static final long oneSecond = 10000000;
+    static final int numClients = 3;
+    static final int numLocks = 3;
+    static final long oneSecond = 1000000;
 
     Random random = ThreadedKernel.random;
-    Lock[] locks = new Lock[numClients + 1];
-    LinkedList<Operation> operations;
+    Lock[] locks = new Lock[numLocks + 1];
+    LinkedList<Operation> operations = new LinkedList<>();
     long baseTime;
-    int[] fathers = new int[numClients + 1];
+    int programCounter = 0;
+    int[] resourceWait = new int[numClients + 1];
+    int[] lockHolder = new int[numLocks + 1];
     int[] priorities = new int[numClients + 1];
     long[] acquireTime = new long[numClients + 1];
-    LinkedList<Integer> answers;
+    int[] effective = new int[numClients + 1];
+    LinkedList<Integer> answers = new LinkedList<>();
 
     void threadReport(int pid) {
         Lib.assertTrue(!answers.isEmpty());
@@ -481,25 +508,28 @@ class InstructionsGenerator {
 
     public InstructionsGenerator() {
         baseTime = Machine.timer().getTime();
-        for (int i = 0; i <= numClients; ++i)
+        for (int i = 0; i <= numLocks; ++i) {
             locks[i] = new Lock();
+            lockHolder[i] = -1;
+        }
         for (int i = 1; i <= numClients; ++i) {
             priorities[i] = 1;
-            fathers[i] = -1;
+            resourceWait[i] = -1;
         }
     }
 
-    boolean isAncestor(int fa, int ch) {
-        for (; fathers[ch] != -1 && ch != fa; ) {
-            ch = fathers[ch];
+    boolean willDeadlock(int thread, int lock) {
+        for (; lockHolder[lock] != thread && lockHolder[lock] != -1; ) {
+            lock = resourceWait[lockHolder[lock]];
+            Lib.assertTrue(lock != -1);
         }
-        return ch == fa;
+        return lockHolder[lock] == thread;
     }
 
-    ArrayList<Integer> getReadyThreads() {
+    ArrayList<Integer> getWaitThreads(int lock) {
         ArrayList<Integer> free = new ArrayList<>();
         for (int i = 1; i <= numClients; ++i) {
-            if (fathers[i] == -1) {
+            if (resourceWait[i] == lock) {
                 free.add(i);
             }
         }
@@ -515,11 +545,22 @@ class InstructionsGenerator {
     }
 
     void updateEffectivePriority() {
+        for (int i = 1; i <= numClients; ++i)
+            effective[i] = priorities[i];
+        for (int i = 1; i <= numClients; ++i) {
+            int u = i;
 
+            while (resourceWait[u] != -1) {
+                int v = lockHolder[resourceWait[u]];
+                Lib.assertTrue(v != -1);
+                effective[v] = Math.max(effective[v], effective[u]);
+                u = v;
+            }
+        }
     }
 
     void generateOperation() {
-        ArrayList<Integer> free = getReadyThreads();
+        ArrayList<Integer> free = getWaitThreads(-1);
         while (true) {
             int b = random.nextInt(4);
             if (b == 0) { // link
@@ -527,31 +568,49 @@ class InstructionsGenerator {
                     continue;
 
                 int u = free.get(random.nextInt(free.size()));
-
-                while (true) {
-                    int v = random.nextInt(numClients) + 1;
-                    if (!isAncestor(u, v)) {
-                        operations.add(new Operation(u).acquire(locks[v]));
-                        break;
+                Lib.assertTrue(resourceWait[u] == -1);
+                for (int i = 1; i <= 100; ++i) {
+                    int lock = random.nextInt(numLocks) + 1;
+                    if (!willDeadlock(u, lock)) {
+                        operations.add(new Operation(u).acquire(lock));
+                        if (lockHolder[u] == -1)
+                            lockHolder[lock] = u;
+                        else
+                            resourceWait[u] = lock;
+                        return;
                     }
                 }
-            } else if (b == 1) { // run
-                operations.add(new Operation(0).acquire(locks[0]));
-                operations.add(new Operation(-1).acquire(locks[0]));
-                operations.add(new Operation(0).release(locks[0]).setReport());
-                operations.add(new Operation(-1).release(locks[0]));
+            } else if (b == 100) { // run
+                operations.add(new Operation(0).acquire(0));
+                operations.add(new Operation(-1).acquire(0));
+                operations.add(new Operation(0).release(0).setReport());
+                operations.add(new Operation(-1).release(0));
 
                 updateEffectivePriority();
                 free.sort(new Comp());
                 for (int v : free)
-                    answers.push(v);
+                    answers.addLast(v);
                 break;
-            } else if (b == 2) { // cut
+            } else if (b == 2) { // release
                 int u = free.get(random.nextInt(free.size()));
-                operations.add(new Operation(u).release(locks[u]));
-                for (int i = 1; i <= numClients; ++i)
-                    if (fathers[i] == u)
-                        fathers[i] = -1;
+                if (resourceWait[u] == -1)
+                    continue;
+
+                ArrayList<Integer> holdingLocks = new ArrayList<>();
+                for (int i = 1; i <= numLocks; ++i)
+                    if (lockHolder[i] == u)
+                        holdingLocks.add(i);
+
+                int lock = holdingLocks.get(random.nextInt(holdingLocks.size()));
+
+                operations.add(new Operation(u).release(lock));
+                Lib.assertTrue(lockHolder[lock] == u);
+
+                updateEffectivePriority();
+                free.sort(new Comp());
+                int newHolder = free.get(0);
+                lockHolder[lock] = newHolder;
+                resourceWait[newHolder] = -1;
                 break;
             } else if (b == 3) { // set priority
                 int u = random.nextInt(numClients) + 1;
@@ -565,14 +624,53 @@ class InstructionsGenerator {
 
     public Operation nextOperation() {
         long currentTime = Machine.timer().getTime();
+
         if (currentTime - baseTime > oneSecond) {
             baseTime = currentTime;
             operations.removeFirst();
-            if (operations.isEmpty()) {
-                generateOperation();
-            }
         }
+        if (operations.isEmpty())
+            generateOperation();
         return operations.getFirst();
     }
 }
 
+class UniversalSchedulerTest {
+    static InstructionsGenerator generator;
+
+    static class Client implements Runnable {
+        int pid;
+        boolean shouldReport = false;
+
+        Client(int pid) {
+            this.pid = pid;
+        }
+
+        public void run() {
+            while (true) {
+                InstructionsGenerator.Operation op = generator.nextOperation();
+                shouldReport = op.run(shouldReport, pid);
+                ThreadedKernel.alarm.waitUntil(InstructionsGenerator.oneSecond);
+            }
+        }
+    }
+
+    static void selfTest() {
+        generator = new InstructionsGenerator();
+//        Lib.debug('x', "before one second");
+//        ThreadedKernel.alarm.waitUntil(generator.oneSecond);
+//        Lib.debug('x', "after one second");
+
+        KThread[] threads = new KThread[generator.numClients + 1];
+        for (int i = 0; i <= generator.numClients; ++i) {
+            threads[i] = new KThread(new Client(i)).setName("P" + i);
+        }
+        for (int i = 0; i <= generator.numClients; ++i) {
+            threads[i].fork();
+        }
+        for (int i = 0; i <= generator.numClients; ++i) {
+            threads[i].join();
+        }
+        Lib.debug('z', "finished");
+    }
+}

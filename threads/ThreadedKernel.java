@@ -60,13 +60,14 @@ public class ThreadedKernel extends Kernel {
 //        seed = -2014348969010379264l; // 2, 2
 //        seed = -108121132699258408l; // 1, 2
 //        seed = 8383159614660730322l; // for Cond2 test
+        seed = -6444553281654560242l;
 
         random.setSeed(seed);
         System.err.printf("Random seed = %d\n", seed);
+        UniversalSchedulerTest.selfTest();
 //        Lib.debug('X', String.format("Random seed = %d", seed));
-
         //PriorityTest.selfTest();
-        PriorityTest.selfTest3();
+//        PriorityTest.selfTest3();
 //        Alarm.selfTest();
        // CommunicatorTest.selfTest();
 //        Boat.selfTest();
