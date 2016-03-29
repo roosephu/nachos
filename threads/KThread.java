@@ -283,10 +283,6 @@ public class KThread {
         Lib.assertTrue(this != currentThread);
 
         boolean initStatus = Machine.interrupt().disable();
-        if (waitQueue == null) {
-            waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-            waitQueue.acquire(this);
-        }
         if (status != statusFinished) {
             waitQueue.waitForAccess(currentThread);
             currentThread.sleep();
@@ -469,5 +465,11 @@ public class KThread {
     /**
      * our code
      */
-    private ThreadQueue waitQueue = null;
+    private ThreadQueue waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+
+    {
+        boolean intStatus = Machine.interrupt().disable();
+        waitQueue.acquire(this);
+        Machine.interrupt().restore(intStatus);
+    }
 }
