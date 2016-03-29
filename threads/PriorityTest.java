@@ -211,7 +211,7 @@ public class PriorityTest {
                 }
                 mutex.release();
             }
-        });
+        }).setName("t");
         ThreadedKernel.scheduler.setPriority(t, 0);
         KThread t2 = new KThread(new Runnable() {
             @Override
@@ -226,7 +226,7 @@ public class PriorityTest {
                 }
                 mutex.release();
             }
-        });
+        }).setName("t2");
         ThreadedKernel.scheduler.setPriority(t2, 2);
         KThread t3 = new KThread(new Runnable() {
             @Override
@@ -242,7 +242,7 @@ public class PriorityTest {
                     Lib.debug('m', "Middle is always happy " + i);
                 }
             }
-        });
+        }).setName("t3");
         ThreadedKernel.scheduler.setPriority(t3, 1);
         t.fork();
         t2.fork();

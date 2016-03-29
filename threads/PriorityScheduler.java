@@ -386,6 +386,7 @@ public class PriorityScheduler extends Scheduler {
              */
             waitingFor = null;
             resourceList.add(waitQueue); // I will own the queue soon
+//            waitQueue.ownedThread = this;
 
             updateEffectivePriority();
 //            isValid = false;
