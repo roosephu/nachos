@@ -8,10 +8,10 @@ import nachos.machine.Machine;
 public class Test {
 
     public static void selfTest() {
-    	//selfTestCondition2();
+        //selfTestCondition2();
         //selfTestJoin();
         //selfTestAlarm();
-        selfTestPriority1();
+//        selfTestPriority1();
         selfTestPriority2();
     }
 
@@ -46,9 +46,9 @@ public class Test {
                 t2.join();
                 System.out.println("In join test: t3 starts.");
                 for (int i = 0; i < 5; i++) {
-                	System.out.println("In join test: thread 3 looped "
-                			+ i + " times");
-                	KThread.currentThread().yield();
+                    System.out.println("In join test: thread 3 looped "
+                            + i + " times");
+                    KThread.currentThread().yield();
                 }
             }
         });
@@ -59,9 +59,9 @@ public class Test {
                 t2.join();
                 System.out.println("In join test: t4 starts.");
                 for (int i = 0; i < 5; i++) {
-                	System.out.println("In join test: thread 4 looped "
-                			+ i + " times");
-                	KThread.currentThread().yield();
+                    System.out.println("In join test: thread 4 looped "
+                            + i + " times");
+                    KThread.currentThread().yield();
                 }
             }
         });
@@ -104,7 +104,7 @@ public class Test {
     //test by milk buying
 
     static class Milk {
-    	public int num = 0;
+        public int num = 0;
     }
 
     private static void selfTestCondition2() {
@@ -121,7 +121,7 @@ public class Test {
                     }
                     milk.num++;
                     condition.wakeAll();
-                    System.out.println("In Condition2 test, buy "+i+"th milk");
+                    System.out.println("In Condition2 test, buy " + i + "th milk");
                     lock.release();
                 }
                 System.out.println("In condition2 test, buyer ends.");
@@ -134,15 +134,15 @@ public class Test {
                 for (int i = 0; i < 100; i++) {
                     lock.acquire();
                     while (milk.num == 0) {
-                    	condition.wake();
+                        condition.wake();
                         condition.sleep();
                     }
-                    milk.num--;      
-                    System.out.println("In condition2 test, drink "+i+"th milk");
+                    milk.num--;
+                    System.out.println("In condition2 test, drink " + i + "th milk");
                     lock.release();
                 }
                 System.out.println("In condition2 test, drinker ends.");
-            }       
+            }
         };
         KThread t2 = new KThread(drinker);
         KThread t3 = new KThread(drinker);
@@ -157,9 +157,9 @@ public class Test {
         t4.join();
         System.out.println("End condition test.");
     }
-    
+
     private static class PriorityTest implements Runnable {
-    	PriorityTest(int priority) {
+        PriorityTest(int priority) {
             this.priority = priority;
         }
 
@@ -173,100 +173,100 @@ public class Test {
 
         private int priority;
     }
-    
+
     private static void selfTestPriority1() {
-    	Vector<KThread> threads = new Vector();
-    	for(int i = 1; i <= 7; i ++) {
-    		threads.add(new KThread(new PriorityTest(i)));
-    		boolean intstatus = Machine.interrupt().disable();
-    		ThreadedKernel.scheduler.setPriority(threads.get(i-1), i);
-    		Machine.interrupt().restore(intstatus);
-    	}
-    	for(int i = 0; i < 7; i ++) {
-    		threads.get(i).fork();
-    	}
-    	for(int i = 0; i < 7; i ++) {
-    		threads.get(i).join();
-    	}
+        Vector<KThread> threads = new Vector();
+        for (int i = 1; i <= 7; i++) {
+            threads.add(new KThread(new PriorityTest(i)));
+            boolean intstatus = Machine.interrupt().disable();
+            ThreadedKernel.scheduler.setPriority(threads.get(i - 1), i);
+            Machine.interrupt().restore(intstatus);
+        }
+        for (int i = 0; i < 7; i++) {
+            threads.get(i).fork();
+        }
+        for (int i = 0; i < 7; i++) {
+            threads.get(i).join();
+        }
     }
-    
+
     private static void selfTestPriority2() {
-		boolean intstatus = Machine.interrupt().disable();
-    	final Lock lock1 = new Lock();
-    	final Lock lock2 = new Lock();
-    	
-    	Runnable r4 = new Runnable() {
+        boolean intstatus = Machine.interrupt().disable();
+        final Lock lock1 = new Lock();
+        final Lock lock2 = new Lock();
+
+        Runnable r4 = new Runnable() {
             @Override
             public void run() {
-            	System.out.println("In priority test2 : thread4 acquire lock1.");
-            	lock1.acquire();
-            	System.out.println("In priority test2 : thread4 got lock1.");
+                System.out.println("In priority test2 : thread4 acquire lock1.");
+                lock1.acquire();
+                System.out.println("In priority test2 : thread4 got lock1.");
                 for (int i = 0; i < 3; i++) {
                     System.out.println("In priority test2 : thread4" + " looped "
                             + i + " times");
                     //KThread.currentThread().yield();
                 }
-            	lock1.release();
-            }       
+                lock1.release();
+            }
         };
-        final KThread t4 = new KThread(r4);
+        final KThread t4 = new KThread(r4).setName("t4");
         ThreadedKernel.scheduler.setPriority(t4, 6);
-        
-       	Runnable r2 = new Runnable() {
+
+        Runnable r2 = new Runnable() {
             @Override
-            public void run() {   	
+            public void run() {
                 for (int i = 0; i < 3; i++) {
-                	lock2.acquire();
+                    lock2.acquire();
                     System.out.println("In priority test2 : thread2" + " looped "
                             + i + " times");
                     lock2.release();
-                   // KThread.currentThread().yield();
+                    // KThread.currentThread().yield();
                 }
-            	
-            }       
+
+            }
         };
-        final KThread t2 = new KThread(r2);
+        final KThread t2 = new KThread(r2).setName("t2");
         ThreadedKernel.scheduler.setPriority(t2, 7);
-        
-       	Runnable r3 = new Runnable() {
+
+        Runnable r3 = new Runnable() {
             @Override
-            public void run() {   
-            	lock2.acquire();
+            public void run() {
+                lock2.acquire();
                 for (int i = 0; i < 5; i++) {
                     System.out.println("In priority test2 : thread3" + " looped "
-                            + i + " times");    
-                    if(i==1)
-                    	t4.fork();
+                            + i + " times");
+                    if (i == 1)
+                        t4.fork();
                     KThread.currentThread().yield();
-                    
+
                 }
                 lock2.release();
-            }       
+            }
         };
-        final KThread t3 = new KThread(r3);
-        ThreadedKernel.scheduler.setPriority(t3, 1);    	
-        
+        final KThread t3 = new KThread(r3).setName("t3");
+        ThreadedKernel.scheduler.setPriority(t3, 1);
+
         Runnable r1 = new Runnable() {
             @Override
             public void run() {
-            	lock1.acquire();
-            	System.out.println("In priority test2 : thread1 got lock1.");
+                lock1.acquire();
+                System.out.println("In priority test2 : thread1 got lock1.");
                 for (int i = 0; i < 5; i++) {
                     System.out.println("In priority test2 : thread1" + " looped "
                             + i + " times");
                     KThread.currentThread().yield();
                 }
-            	lock1.release();
-            }       
+                lock1.release();
+            }
         };
-        final KThread t1 = new KThread(r1);
+        final KThread t1 = new KThread(r1).setName("t1");
         ThreadedKernel.scheduler.setPriority(t1, 1);
-        
+
         Machine.interrupt().restore(intstatus);
-        
-        t1.fork();       
+
+        t1.fork();
         t2.fork();
-        t3.fork();         
+        t3.fork();
         t1.join();
         t2.join();
         t3.join();

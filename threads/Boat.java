@@ -9,16 +9,17 @@ public class Boat {
     public static void selfTest() {
         BoatGrader b = new BoatGrader();
 
-        int adults = 10, children = 10;
+        // System.out.println("\n ***Testing Boats with only 2 children***");
+        // begin(3, 4, b);
 
-//        System.out.println("\n ***Testing Boats with only 2 children***");
-//        begin(0, 5, b);
+        // System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
+        // begin(1, 2, b);
 
-//	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
-//  	begin(1, 2, b);
+        // System.out.println("\n ***Testing Boats with 3 children, 3 adults***");
+        // begin(3, 3, b);
 
-        System.out.printf("\n ***Testing Boats with %d children, %d adults***", children, adults);
-  	begin(adults, children, b);
+        // stress test
+        begin(20,10,b);
     }
 
     public static void begin(int adults, int children, BoatGrader b) {
@@ -30,170 +31,174 @@ public class Boat {
 
         // Create threads here. See section 3.4 of the Nachos for Java
         // Walkthrough linked from the projects page.
-        numAdultOahu = adults;
-        numChildOahu = children;
 
-        for (int i = 1; i <= adults; ++i) {
-            KThread t = new KThread(new Runnable() {
-                public void run() {
-                    AdultItinerary();
-                }
-            });
-            t.setName("Adult-" + Integer.toString(i)).fork();
+        communicator = new Communicator();
+        oahu = new Information();
+        molokai = new Information();
+        oahu.hasBoat = true;
+        mutex = new Lock();
+        waitMolokai = new Condition(mutex);
+        waitOahu = new Condition(mutex);
+        waitToGo = new Condition(mutex);
+
+        Runnable r = new Runnable() {
+            public void run() {
+                ChildItinerary();
+            }
+        };
+
+        for (int i = 0; i < children; i++) {
+            KThread t = new KThread(r);
+            t.setName("Child " + i);
+            t.fork();
         }
 
-        for (int i = 1; i <= children; ++i) {
-            KThread t = new KThread(new Runnable() {
-                public void run() {
-                    ChildItinerary();
-                }
-            });
-            t.setName("Child-" + Integer.toString(i)).fork();
+        r = new Runnable() {
+            public void run() {
+                AdultItinerary();
+            }
+        };
+
+        for (int i = 0; i < adults; i++) {
+            KThread t = new KThread(r);
+            t.setName("Adult " + i);
+            t.fork();
         }
 
-        while (true) {
-            if (communicator.listen() == adults + children) {
-                finishedTravel = true;
+        while (communicator.listen() != adults + children)
+            ;
+    }
+
+    static boolean can(int type, Information loc) {
+        if (!loc.hasBoat)
+            return false;
+        if (type == ADULT)
+            return loc.waitingChildren == 0;
+        else
+            return loc.waitingChildren <= 1;
+    }
+
+    static void report() {
+        communicator.speak(molokai.cnt[0] + molokai.cnt[1]);
+    }
+
+    static void travel(int type, boolean row, boolean ride, Information from,
+                       Information to) {
+        int mask = type * 4;
+        if (row)
+            mask += 2;
+        if (to == oahu)
+            mask += 1;
+
+        switch (mask) {
+            case 0:// 000
+                bg.AdultRideToMolokai();
                 break;
+            case 1:// 001
+                bg.AdultRideToOahu();
+                break;
+            case 2:// 010
+                bg.AdultRowToMolokai();
+                break;
+            case 3:// 011
+                bg.AdultRowToOahu();
+                break;
+            case 4:// 100
+                bg.ChildRideToMolokai();
+                break;
+            case 5:
+                bg.ChildRideToOahu();
+                break;
+            case 6:
+                bg.ChildRowToMolokai();
+                break;
+            case 7:
+                bg.ChildRowToOahu();
+                break;
+            default:
+                break;
+        }
+        from.cnt[type]--;
+        to.cnt[type]++;
+        if (type == CHILD)
+            from.waitingChildren--;
+
+        if (row)
+            from.hasBoat = false;
+
+        if (ride) {
+            to.hasBoat = true;
+            if (to == molokai) {
+                report();
+                waitMolokai.wakeAll();
+            } else {
+                waitOahu.wakeAll();
             }
         }
-
-        System.out.println("done");
     }
 
     static void AdultItinerary() {
-        bg.initializeAdult(); //Required for autograder interface. Must be the first thing called.
-        //DO NOT PUT ANYTHING ABOVE THIS LINE.
+        bg.initializeAdult(); // Required for autograder interface. Must be the
+        // first thing called.
+        // DO NOT PUT ANYTHING ABOVE THIS LINE.
 
-	/* This is where you should put your solutions. Make calls
-           to the BoatGrader to show that it is synchronized. For
-	   example:
-	       bg.AdultRowToMolokai();
-	   indicates that an adult has rowed the boat across to Molokai
-	*/
+		/*
+		 * This is where you should put your solutions. Make calls to the
+		 * BoatGrader to show that it is synchronized. For example:
+		 * bg.AdultRowToMolokai(); indicates that an adult has rowed the boat
+		 * across to Molokai
+		 */
 
-        int currentLocation = OAHU;
-
-//        lockInfoOahu.acquire();
-        globalLock.acquire();
-//        numAdultOahu += 1;
-        oahu.wake();
-        oahu.sleep();
-
-//        lockBoat.acquire();
-        while (true) {
-            if (currentLocation == OAHU) { // Oahu
-                if (numChildOahu < 2 && boatLocation == OAHU && boatSeats == 2) {
-                    numAdultOahu -= 1;
-                    bg.AdultRideToMolokai(); // arrival
-                    numAdultMolokai += 1;
-//                    lockInfoOahu.release();
-
-                    boatLocation = MOLOKAI;
-//                    lockInfoMolokai.acquire();
-                    molokai.wakeAll();
-//                    lockInfoMolokai.release();
-                    globalLock.release();
-
-                    break;
-                } else {
-                    oahu.wakeAll();
-                    oahu.sleep();
-                }
-            } else { // Molokai
-                break; // never comes back to Oahu
-            }
+        oahu.cnt[ADULT]++;
+        mutex.acquire();
+        while (!(can(ADULT, oahu)) || oahu.cnt[CHILD] >= 2) {
+            if (oahu.hasBoat)
+                waitOahu.wakeAll();
+            waitOahu.sleep();
         }
-
-
+        travel(ADULT, true, true, oahu, molokai);
+        mutex.release();
     }
 
     static void ChildItinerary() {
-        bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
-        //DO NOT PUT ANYTHING ABOVE THIS LINE.
+        bg.initializeChild(); // Required for autograder interface. Must be the
+        // first thing called.
+        // DO NOT PUT ANYTHING ABOVE THIS LINE.
 
-        int currentLocation = OAHU;
-
-//        lockInfoOahu.acquire();
-        globalLock.acquire();
-//        numChildOahu += 1;
-        oahu.wakeAll();
-        oahu.sleep();
-
-        while (true) {
-            if (currentLocation == OAHU) {
-                if (boatLocation == OAHU) {
-                    if (boatSeats == 2 && numChildOahu > 1) {
-                        boatSeats = 1;
-                        bg.ChildRowToMolokai();
-                        numChildOahu -= 1;
-                        numChildMolokai += 1;
-                        oahu.wakeAll();
-//                        lockInfoMolokai.acquire();
-//                        lockInfoOahu.release();
-
-                        currentLocation = MOLOKAI;
-                        molokai.sleep();
-                        boatSeats = 2;
-                        boatLocation = MOLOKAI;
-                        molokai.wakeAll();
-                    } else if (boatSeats == 1) {
-                        boatSeats = 0;
-                        bg.ChildRideToMolokai();
-                        numChildMolokai += 1;
-                        numChildOahu -= 1;
-                        currentLocation = MOLOKAI;
-//                        lockInfoOahu.release();
-
-//                        lockInfoMolokai.acquire();
-                        molokai.wakeAll();
-                        molokai.sleep();
+        oahu.cnt[CHILD]++;
+        Information where = oahu;
+        for (;;) {
+            mutex.acquire();
+            if (where == oahu) {
+                while (!can(CHILD, oahu)
+                        || (oahu.cnt[ADULT] > 0 && oahu.cnt[CHILD] == 1)) {
+                    if (oahu.hasBoat)
+                        waitOahu.wakeAll();
+                    waitOahu.sleep();
+                }
+                oahu.waitingChildren++;
+                if (oahu.cnt[CHILD] >= 2) {
+                    if (oahu.waitingChildren == 1) {
+                        waitToGo.sleep();
+                        travel(CHILD, false, true, oahu, molokai);
                     } else {
-                        /**
-                         * Must wake now.
-                         * If an adult comes at last, we must wake it up.
-                         */
-                        oahu.wakeAll();
-                        oahu.sleep();
+                        waitToGo.wake();
+                        travel(CHILD, true, false, oahu, molokai);
                     }
                 } else {
-                    oahu.wakeAll();
-                    oahu.sleep();
+                    travel(CHILD, true, true, oahu, molokai);
                 }
+                where = molokai;
             } else {
-                /**
-                 * The reason we release the lock here is that
-                 * when we talk to God, the adult can come in can then
-                 * requires the lockInfoMolokai. But it cannot get it
-                 * therefore the adult process will be interrupted.
-                 */
-//                lockInfoMolokai.release();
-                globalLock.release();
-                communicator.speak(numAdultMolokai + numChildMolokai);
-//                molokai.sleep();
-                if (finishedTravel) {
-                    break;
+                while (!can(CHILD, molokai)) {
+                    if (molokai.hasBoat)
+                        waitMolokai.wakeAll();
+                    waitMolokai.sleep();
                 }
-
-//                lockInfoMolokai.acquire();
-                globalLock.acquire();
-                Lib.debug('t', "boatLocation = " + Integer.toString(boatLocation));
-                if (boatLocation == MOLOKAI) {
-                    bg.ChildRideToOahu();
-                    currentLocation = OAHU;
-                    numChildOahu += 1;
-                    numChildMolokai -= 1;
-                    boatLocation = OAHU;
-//                    lockInfoMolokai.release();
-
-//                    lockInfoOahu.acquire();
-                    oahu.wakeAll();
-                    oahu.sleep();
-                } else {
-                    molokai.wake();
-                    molokai.sleep();
-                }
+                travel(CHILD, true, true, molokai, oahu);
+                where = oahu;
             }
+            mutex.release();
         }
     }
 
@@ -202,35 +207,24 @@ public class Boat {
         // all of them on the boat). Please also note that you may not
         // have a single thread calculate a solution and then just play
         // it back at the autograder -- you will be caught.
-        System.out.println("\n ***Everyone piles on the boat and goes to Molokai***");
+        Lib.debug('m',"\n ***Everyone piles on the boat and goes to Molokai***");
         bg.AdultRowToMolokai();
         bg.ChildRideToMolokai();
         bg.AdultRideToMolokai();
         bg.ChildRideToMolokai();
     }
 
-    public static final int OAHU = 1;
-    public static final int MOLOKAI = 2;
-    public static final int SEA = 3;
+    private static Communicator communicator;
+    private static Information oahu, molokai;
+    private static Lock mutex;
+    private static Condition waitMolokai, waitOahu, waitToGo;
 
-    static Lock globalLock = new Lock();
-    static Lock lockInfoOahu = new Lock();
-    static Lock lockInfoMolokai = new Lock();
+    private static class Information {
+        int waitingChildren;
+        int[] cnt = new int[2];
+        boolean hasBoat;
+    }
 
-    static int numChildOahu = 0;
-    static int numAdultOahu = 0;
-    static int numChildMolokai = 0;
-    static int numAdultMolokai = 0;
-
-    static boolean finishedTravel = false;
-
-    static Condition oahu = new Condition(globalLock);
-    static Condition molokai = new Condition(globalLock);
-
-    static int boatLocation = OAHU;
-    static int boatSeats = 2;
-    static Lock lockBoat = new Lock();
-    static Condition boat = new Condition(lockBoat);
-
-    static Communicator communicator = new Communicator();
+    private static final int ADULT = 0;
+    private static final int CHILD = 1;
 }
