@@ -190,14 +190,14 @@ public class KThread {
         Lib.assertTrue(toBeDestroyed == null);
         toBeDestroyed = currentThread;
 
+        currentThread.status = statusFinished;
+
         while (currentThread.waitQueue != null) {
             KThread thread = currentThread.waitQueue.nextThread();
             if (thread == null)
                 break;
             thread.ready();
         }
-
-        currentThread.status = statusFinished;
 
         sleep();
     }
@@ -285,7 +285,7 @@ public class KThread {
         boolean initStatus = Machine.interrupt().disable();
         if (waitQueue == null) {
             waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-//            waitQueue.acquire(this);
+            waitQueue.acquire(this);
         }
         if (status != statusFinished) {
             waitQueue.waitForAccess(currentThread);
