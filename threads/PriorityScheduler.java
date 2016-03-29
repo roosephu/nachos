@@ -163,8 +163,10 @@ public class PriorityScheduler extends Scheduler {
                 return null;
             }
             ThreadState threadState = priorityQueue.poll();
+            Lib.assertTrue(threadState.waitingFor == this);
 
             ownedThread = threadState;
+            threadState.waitingFor = null;
             threadState.acquire(this);
             Lib.assertTrue(ownedThread.waitingFor != this);
 
@@ -384,7 +386,6 @@ public class PriorityScheduler extends Scheduler {
              * for now). And all the threads waiting for this resource must donate
              * their priority to me.
              */
-            waitingFor = null;
             resourceList.add(waitQueue); // I will own the queue soon
 //            waitQueue.ownedThread = this;
 
@@ -563,7 +564,7 @@ class InstructionsGenerator {
         }
     }
 
-    void generateOperation() {
+    void generateOperation1() {
         ArrayList<Integer> free = getWaitThreads(-1);
         while (true) {
             int b = random.nextInt(4);
@@ -637,6 +638,15 @@ class InstructionsGenerator {
                 break;
             }
         }
+    }
+
+    void generateOperation() {
+        operations.add(new Operation(1).acquire(1));
+        operations.add(new Operation(2).acquire(2));
+        operations.add(new Operation(2).acquire(1));
+        operations.add(new Operation(3).acquire(2));
+        answers.addLast(1);
+        answers.addLast(2);
     }
 
     public Operation nextOperation() {
