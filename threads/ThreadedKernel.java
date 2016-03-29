@@ -67,7 +67,8 @@ public class ThreadedKernel extends Kernel {
  //       UniversalSchedulerTest.selfTest();
 //        Lib.debug('X', String.format("Random seed = %d", seed));
         //PriorityTest.selfTest();
-        PriorityTest.selfTest3();
+//        PriorityTest.selfTest3();
+        PriorityTest.selfTest4();
 //        Alarm.selfTest();
        // CommunicatorTest.selfTest();
 //        Boat.selfTest();
