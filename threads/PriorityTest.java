@@ -268,10 +268,11 @@ public class PriorityTest {
         Machine.interrupt().restore(intStatus);
         ThreadedKernel.alarm.waitUntil(1000000);
     }
-    static int total = 0;
+    static int total = 200;
     static int count = 0;
-    static final int lockCount = 10;
+    static final int lockCount = 1;
 
+    static KThread[] threads = new KThread[total];
     public static void selfTest4() {
         Lib.assertTrue(ThreadedKernel.scheduler instanceof PriorityScheduler,
                 "this test requires priority scheduler");
@@ -279,8 +280,6 @@ public class PriorityTest {
         lock = new Lock[lockCount];
         for (int i = 0; i < lockCount; ++i)
             lock[i] = new Lock();
-        total = 5;
-        KThread[] threads = new KThread[total];
 //    /* Test ThreadGrader6.a: Tests priority donation */
 //        total = 20;
 //        count = 0;
@@ -302,13 +301,13 @@ public class PriorityTest {
         count = 0;
         for (int i = 0; i < total; ++i)
         {
-            threads[i] = new KThread(new a());
+            threads[i] = new KThread(new a(i));
             boolean intStatus = Machine.interrupt().disable();
 
             ThreadedKernel.scheduler.setPriority(threads[i],
                     ThreadedKernel.random.nextInt(PriorityScheduler.priorityMaximum + 1));
             Machine.interrupt().restore(intStatus);
-
+            threads[i].fork();
         }
         for (int i = 0; i < total; ++i)
             threads[i].join();
@@ -319,14 +318,109 @@ public class PriorityTest {
     private static class a implements Runnable
     {
         int n = 0;
-
+        int id;
+        public a(int _id){ id = _id;}
         public void run ()
         {
             n = Lib.random(lockCount);
+            if (id != 0)
+            {
+                threads[Lib.random(id)].join();
+            }
             lock[n].acquire();
             lock[n].release();
             ++count;
         }
     }
 
+
+    static public void selfTest5()
+    {
+        Lib.assertTrue(ThreadedKernel.scheduler.getClass().getSimpleName().equals(
+                "PriorityScheduler"), "This grader needs priority scheduler.");
+
+        testLock();
+
+        testJoin();
+
+    }
+
+    static Lock lock1;
+    static private void testLock ()
+    {
+        lock1 = new Lock();
+        lock1.acquire();
+
+        boolean insStatus = Machine.interrupt().disable();
+        ThreadedKernel.scheduler.setPriority(lowPriority);
+
+        KThread highThead = new KThread(new Runnable()
+        {
+            @Override
+            public void run ()
+            {
+                lock1.acquire();
+                lock1.release();
+            }
+        });
+        ThreadedKernel.scheduler.setPriority(highThead, highPriority);
+        highThead.fork();
+        KThread midThread = new KThread(new Runnable()
+        {
+            @Override
+            public void run ()
+            {
+                alwaysYield();
+                Lib.assertTrue(false, "Maybe error in your priority donation.");
+            }
+        });
+        ThreadedKernel.scheduler.setPriority(midThread, midPriority);
+        midThread.fork();
+        Machine.interrupt().restore(insStatus);
+
+        alwaysYield();
+        lock1.release();
+    }
+
+    static private void testJoin ()
+    {
+        boolean insStatus = Machine.interrupt().disable();
+        ThreadedKernel.scheduler.setPriority(highPriority);
+
+        KThread lowThread = new KThread(new Runnable()
+        {
+            @Override
+            public void run ()
+            {
+                alwaysYield();
+            }
+        });
+        ThreadedKernel.scheduler.setPriority(lowThread, lowPriority);
+        lowThread.fork();
+        KThread midThread1 = new KThread(new Runnable()
+        {
+            @Override
+            public void run ()
+            {
+                alwaysYield();
+                Lib.assertTrue(false, "Maybe error in your priority donation.");
+            }
+        });
+        ThreadedKernel.scheduler.setPriority(midThread1, midPriority);
+        midThread1.fork();
+        Machine.interrupt().restore(insStatus);
+        lowThread.join();
+    }
+
+    static private void alwaysYield ()
+    {
+        for (int i = 0; i < 10000; ++i)
+        {
+            KThread.yield();
+        }
+    }
+
+    public static final int highPriority = PriorityScheduler.priorityMaximum;
+    public static final int midPriority = PriorityScheduler.priorityMaximum - 1;
+    public static final int lowPriority = PriorityScheduler.priorityMaximum - 2;
 }
