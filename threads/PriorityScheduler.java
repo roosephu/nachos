@@ -156,10 +156,10 @@ public class PriorityScheduler extends Scheduler {
             // The owned thread has finished everything it wants, so he is releasing resources.
             if (ownedThread != null) {
                 ownedThread.removeWaitingQueue(this);
+                ownedThread = null;
             }
 
             if (priorityQueue.isEmpty()) {
-                ownedThread = null;
                 return null;
             }
             ThreadState threadState = priorityQueue.poll();
@@ -564,7 +564,7 @@ class InstructionsGenerator {
         }
     }
 
-    void generateOperation1() {
+    void generateOperation() {
         ArrayList<Integer> free = getWaitThreads(-1);
         while (true) {
             int b = random.nextInt(4);
@@ -640,7 +640,7 @@ class InstructionsGenerator {
         }
     }
 
-    void generateOperation() {
+    void generateOperation2() {
         operations.add(new Operation(1).acquire(1));
         operations.add(new Operation(2).acquire(2));
         operations.add(new Operation(2).acquire(1));
