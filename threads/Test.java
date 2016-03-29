@@ -191,13 +191,13 @@ public class Test {
     }
     
     private static void selfTestPriority2() {
+		boolean intstatus = Machine.interrupt().disable();
     	final Lock lock1 = new Lock();
     	final Lock lock2 = new Lock();
     	
     	Runnable r4 = new Runnable() {
             @Override
             public void run() {
-            	//ThreadedKernel.alarm.waitUntil(0);
             	System.out.println("In priority test2 : thread4 acquire lock1.");
             	lock1.acquire();
             	System.out.println("In priority test2 : thread4 got lock1.");
@@ -262,21 +262,14 @@ public class Test {
         final KThread t1 = new KThread(r1);
         ThreadedKernel.scheduler.setPriority(t1, 1);
         
-        t1.fork();
-       
-        t2.fork();
-        t3.fork();  
-       // t4.fork();
+        Machine.interrupt().restore(intstatus);
         
+        t1.fork();       
+        t2.fork();
+        t3.fork();         
         t1.join();
         t2.join();
         t3.join();
-        //System.out.println("In priority test2 : back to main thread.");
-        //boolean intstatus = Machine.interrupt().disable();
-        //Machine.interrupt().restore(intstatus);
-        //t4.fork();
-        //t1.join();
-        //t3.join();
         t4.join();
     }
 }
