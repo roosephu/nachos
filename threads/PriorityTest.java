@@ -187,12 +187,12 @@ public class PriorityTest {
     public static void selfTest3() {
         final Lock mutex = new Lock();
         boolean intStatus = Machine.interrupt().disable();
+
         KThread t = new KThread(new Runnable() {
             @Override
             public void run() {
                 mutex.acquire();
                 int s = 0;
-
 
                 boolean intStatus = Machine.interrupt().disable();
                 ThreadedKernel.scheduler.setPriority(KThread.currentThread(), 0);
@@ -206,6 +206,7 @@ public class PriorityTest {
                     Lib.debug('x', "ask result: " + effectivePriority);
                     Machine.interrupt().restore(intStatus);
 
+
                     KThread.yield();
                     Lib.debug('m', "Low is happy " + i);
                 }
@@ -217,14 +218,16 @@ public class PriorityTest {
             @Override
             public void run() {
                 t.join();
-                ThreadedKernel.alarm.waitUntil(500);
-                mutex.acquire();
+                //ThreadedKernel.alarm.waitUntil(500);
+                //mutex.acquire();
                 int s = 0;
                 for (int i = 0; i < 10; i++) {
-                    ThreadedKernel.alarm.waitUntil(1000);
+                  //  ThreadedKernel.alarm.waitUntil(1000);
+
+                    KThread.yield();
                     Lib.debug('m', "High is happy " + i);
                 }
-                mutex.release();
+                //mutex.release();
             }
         }).setName("t2");
         ThreadedKernel.scheduler.setPriority(t2, 2);
@@ -243,11 +246,88 @@ public class PriorityTest {
                 }
             }
         }).setName("t3");
-        ThreadedKernel.scheduler.setPriority(t3, 1);
+        ThreadedKernel.scheduler.setPriority(t3, 2);
+        KThread t4 = new KThread(new Runnable() {
+            @Override
+            public void run() {
+
+                t.join();
+                for (int i = 1; i <=10; i++)
+                {
+                    KThread.yield();
+                    Lib.debug('m', "Extremelly high is happy" + i);
+                }
+            }
+        }).setName("t4");
+        ThreadedKernel.scheduler.setPriority(t4, 2);
+
         t.fork();
         t2.fork();
         t3.fork();
+        t4.fork();
         Machine.interrupt().restore(intStatus);
         ThreadedKernel.alarm.waitUntil(1000000);
     }
+    static int total = 0;
+    static int count = 0;
+    static final int lockCount = 10;
+
+    public static void selfTest4() {
+        Lib.assertTrue(ThreadedKernel.scheduler instanceof PriorityScheduler,
+                "this test requires priority scheduler");
+
+        lock = new Lock[lockCount];
+        for (int i = 0; i < lockCount; ++i)
+            lock[i] = new Lock();
+        total = 5;
+        KThread[] threads = new KThread[total];
+//    /* Test ThreadGrader6.a: Tests priority donation */
+//        total = 20;
+//        count = 0;
+//
+//        for (int i = 0; i < total; ++i) {
+//            threads[i] = new KThread(new a());
+//            threads[i].fork();
+//        }
+//        for (int i = 0; i < total; ++i)
+//            threads[i].join();
+//        Lib.assertTrue(count == total,
+//                "not all threads finished in \nTest ThreadGrader6.a");
+
+    /*
+     * Test ThreadGrader6.b: Tests priority donation with more locks and more
+     * complicated resource allocation
+     */
+
+        count = 0;
+        for (int i = 0; i < total; ++i)
+        {
+            threads[i] = new KThread(new a());
+            boolean intStatus = Machine.interrupt().disable();
+
+            ThreadedKernel.scheduler.setPriority(threads[i],
+                    ThreadedKernel.random.nextInt(PriorityScheduler.priorityMaximum + 1));
+            Machine.interrupt().restore(intStatus);
+
+            threads[i].fork();
+        }
+        for (int i = 0; i < total; ++i)
+            threads[i].join();
+        Lib.assertTrue(count == total,
+                "not all threads finished in \nTest ThreadGrader6.b");
+
+    }
+    private static class a implements Runnable
+    {
+        int n = 0;
+
+        public void run ()
+        {
+            n = Lib.random(lockCount);
+            lock[n].acquire();
+            lock[n].release();
+            ++count;
+        }
+    }
+
 }

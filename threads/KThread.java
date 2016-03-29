@@ -285,7 +285,7 @@ public class KThread {
         boolean initStatus = Machine.interrupt().disable();
         if (waitQueue == null) {
             waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-            waitQueue.acquire(this);
+//            waitQueue.acquire(this);
         }
         if (status != statusFinished) {
             waitQueue.waitForAccess(currentThread);
