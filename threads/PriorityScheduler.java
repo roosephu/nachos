@@ -162,7 +162,7 @@ public class PriorityScheduler extends Scheduler {
             if (priorityQueue.isEmpty()) {
                 return null;
             }
-            Lib.assertTrue(false);
+//            Lib.assertTrue(false);
             ThreadState threadState = priorityQueue.poll();
             Lib.assertTrue(threadState.waitingFor == this);
 
