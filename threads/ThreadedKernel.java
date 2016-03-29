@@ -1,5 +1,6 @@
 package nachos.threads;
 
+import javafx.scene.layout.Priority;
 import nachos.ag.BoatGrader;
 import nachos.machine.*;
 
@@ -64,9 +65,10 @@ public class ThreadedKernel extends Kernel {
         System.err.printf("Random seed = %d\n", seed);
 //        Lib.debug('X', String.format("Random seed = %d", seed));
 
-        Test.selfTest();
+        PriorityTest.selfTest();
+        //Test.selfTest();
 //        Alarm.selfTest();
-//        CommunicatorTest.selfTest();
+       // CommunicatorTest.selfTest();
 //        Boat.selfTest();
 //        KThread.selfTest();
 //        Semaphore.selfTest();
