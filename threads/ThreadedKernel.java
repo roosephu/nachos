@@ -64,10 +64,10 @@ public class ThreadedKernel extends Kernel {
 
         random.setSeed(seed);
         System.err.printf("Random seed = %d\n", seed);
-        UniversalSchedulerTest.selfTest();
+ //       UniversalSchedulerTest.selfTest();
 //        Lib.debug('X', String.format("Random seed = %d", seed));
         //PriorityTest.selfTest();
-//        PriorityTest.selfTest3();
+        PriorityTest.selfTest3();
 //        Alarm.selfTest();
        // CommunicatorTest.selfTest();
 //        Boat.selfTest();

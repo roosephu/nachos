@@ -216,6 +216,7 @@ public class PriorityTest {
         KThread t2 = new KThread(new Runnable() {
             @Override
             public void run() {
+                t.join();
                 ThreadedKernel.alarm.waitUntil(500);
                 mutex.acquire();
                 int s = 0;
