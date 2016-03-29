@@ -1,13 +1,18 @@
 package nachos.threads;
 
+import java.util.Vector;
+
 import nachos.machine.Lib;
+import nachos.machine.Machine;
 
 public class Test {
 
     public static void selfTest() {
-  //      selfTestJoin();
-//        selfTestAlarm();
-        selfTestCondition2();
+    	//selfTestCondition2();
+        //selfTestJoin();
+        //selfTestAlarm();
+        selfTestPriority1();
+        selfTestPriority2();
     }
 
     private static class PingTest implements Runnable {
@@ -26,49 +31,45 @@ public class Test {
         private int which;
     }
 
-    /**
-     * Tests whether join is working.
-     */
-    public static void selfTestJoin() {
+    private static void selfTestJoin() {
 
-        Runnable playload = new Runnable() {
-            @Override
-            public void run() {
-                for (int i = 0; i < 10; i++) {
-                    ThreadedKernel.alarm.waitUntil(1000);
-                    System.out.println("*** thread " + " looped "
-                            + i + " times");
-                }
-                Lib.debug('m', "child dead");
-            }
-        };
-        KThread t1 = new KThread(new PingTest(1));
+        final KThread t1 = new KThread(new PingTest(1));
+        final KThread t2 = new KThread(new PingTest(2));
         t1.fork();
-        t1.join();
-        Lib.debug('m', "parent returned");
-        KThread t2 = new KThread(new PingTest(2));
-        KThread t3 = new KThread(new PingTest(3));
         t2.fork();
-        t3.fork();
+        t1.join();
         t2.join();
-        t3.join();
-        Lib.debug('m', "parent returned");
-        final KThread t4 = new KThread(new PingTest(4));
-
-        //what if one thread is joined by multiple threads?
-        KThread t5 = new KThread(new Runnable() {
+        KThread t3 = new KThread(new Runnable() {
             @Override
             public void run() {
-                t4.join();
-                Lib.debug('m', "another child returned");
+                t1.join();
+                t2.join();
+                System.out.println("In join test: t3 starts.");
+                for (int i = 0; i < 5; i++) {
+                	System.out.println("In join test: thread 3 looped "
+                			+ i + " times");
+                	KThread.currentThread().yield();
+                }
             }
         });
+        KThread t4 = new KThread(new Runnable() {
+            @Override
+            public void run() {
+                t1.join();
+                t2.join();
+                System.out.println("In join test: t4 starts.");
+                for (int i = 0; i < 5; i++) {
+                	System.out.println("In join test: thread 4 looped "
+                			+ i + " times");
+                	KThread.currentThread().yield();
+                }
+            }
+        });
+        t3.fork();
         t4.fork();
-        t5.fork();
+        t3.join();
         t4.join();
-        t5.join();
-        Lib.debug('m', "parent returned");
-
+        System.out.println("End join test.");
     }
 
     private static class AlarmTest implements Runnable {
@@ -78,7 +79,7 @@ public class Test {
 
         public void run() {
             for (int i = 0; i < 5; i++) {
-                System.out.println("*** In alarm test : thread " + which + " looped "
+                System.out.println("In alarm test : thread " + which + " looped "
                         + i + " times");
                 ThreadedKernel.alarm.waitUntil(1000);
             }
@@ -87,7 +88,7 @@ public class Test {
         private int which;
     }
 
-    public static void selfTestAlarm() {
+    private static void selfTestAlarm() {
         KThread t1 = new KThread(new AlarmTest(1));
         t1.fork();
         KThread t2 = new KThread(new PingTest(2));
@@ -97,6 +98,7 @@ public class Test {
         t1.join();
         t2.join();
         t3.join();
+        System.out.println("End alarm test.");
     }
 
     //test by milk buying
@@ -105,7 +107,7 @@ public class Test {
     	public int num = 0;
     }
 
-    public static void selfTestCondition2() {
+    private static void selfTestCondition2() {
         final Lock lock = new Lock();
         final Condition2 condition = new Condition2(lock);
         final Milk milk = new Milk();
@@ -114,15 +116,15 @@ public class Test {
             public void run() {
                 for (int i = 0; i < 30; i++) {
                     lock.acquire();
-                    Lib.debug('t', "In Condition2 test: try to buy milk");
                     while (milk.num != 0) {
-                    	condition.wakeAll();
                         condition.sleep();
                     }
                     milk.num++;
-                    System.out.println("Buy "+i+"th milk");
+                    condition.wakeAll();
+                    System.out.println("In Condition2 test, buy "+i+"th milk");
                     lock.release();
                 }
+                System.out.println("In condition2 test, buyer ends.");
             }
         };
         KThread t1 = new KThread(buyer);
@@ -132,15 +134,15 @@ public class Test {
                 for (int i = 0; i < 10; i++) {
                     lock.acquire();
                     while (milk.num == 0) {
-                        condition.wake();
+                    	condition.wake();
                         condition.sleep();
                     }
-                    milk.num--;
-                    Lib.debug('t', "In Condition2 test: drink a milk");
-                    System.out.println("Drink "+i+"th milk");
+                    milk.num--;      
+                    System.out.println("In condition2 test, drink "+i+"th milk");
                     lock.release();
                 }
-            }
+                System.out.println("In condition2 test, drinker ends.");
+            }       
         };
         KThread t2 = new KThread(drinker);
         KThread t3 = new KThread(drinker);
@@ -152,6 +154,129 @@ public class Test {
         t1.join();
         t2.join();
         t3.join();
+        t4.join();
+        System.out.println("End condition test.");
+    }
+    
+    private static class PriorityTest implements Runnable {
+    	PriorityTest(int priority) {
+            this.priority = priority;
+        }
+
+        public void run() {
+            for (int i = 0; i < 3; i++) {
+                System.out.println("In priority test : thread with priority" + priority + " looped "
+                        + i + " times");
+                KThread.currentThread().yield();
+            }
+        }
+
+        private int priority;
+    }
+    
+    private static void selfTestPriority1() {
+    	Vector<KThread> threads = new Vector();
+    	for(int i = 1; i <= 7; i ++) {
+    		threads.add(new KThread(new PriorityTest(i)));
+    		boolean intstatus = Machine.interrupt().disable();
+    		ThreadedKernel.scheduler.setPriority(threads.get(i-1), i);
+    		Machine.interrupt().restore(intstatus);
+    	}
+    	for(int i = 0; i < 7; i ++) {
+    		threads.get(i).fork();
+    	}
+    	for(int i = 0; i < 7; i ++) {
+    		threads.get(i).join();
+    	}
+    }
+    
+    private static void selfTestPriority2() {
+    	final Lock lock1 = new Lock();
+    	final Lock lock2 = new Lock();
+    	
+    	Runnable r4 = new Runnable() {
+            @Override
+            public void run() {
+            	//ThreadedKernel.alarm.waitUntil(0);
+            	System.out.println("In priority test2 : thread4 acquire lock1.");
+            	lock1.acquire();
+            	System.out.println("In priority test2 : thread4 got lock1.");
+                for (int i = 0; i < 3; i++) {
+                    System.out.println("In priority test2 : thread4" + " looped "
+                            + i + " times");
+                    //KThread.currentThread().yield();
+                }
+            	lock1.release();
+            }       
+        };
+        final KThread t4 = new KThread(r4);
+        ThreadedKernel.scheduler.setPriority(t4, 6);
+        
+       	Runnable r2 = new Runnable() {
+            @Override
+            public void run() {   	
+                for (int i = 0; i < 3; i++) {
+                	lock2.acquire();
+                    System.out.println("In priority test2 : thread2" + " looped "
+                            + i + " times");
+                    lock2.release();
+                   // KThread.currentThread().yield();
+                }
+            	
+            }       
+        };
+        final KThread t2 = new KThread(r2);
+        ThreadedKernel.scheduler.setPriority(t2, 7);
+        
+       	Runnable r3 = new Runnable() {
+            @Override
+            public void run() {   
+            	lock2.acquire();
+                for (int i = 0; i < 5; i++) {
+                    System.out.println("In priority test2 : thread3" + " looped "
+                            + i + " times");    
+                    if(i==1)
+                    	t4.fork();
+                    KThread.currentThread().yield();
+                    
+                }
+                lock2.release();
+            }       
+        };
+        final KThread t3 = new KThread(r3);
+        ThreadedKernel.scheduler.setPriority(t3, 1);    	
+        
+        Runnable r1 = new Runnable() {
+            @Override
+            public void run() {
+            	lock1.acquire();
+            	System.out.println("In priority test2 : thread1 got lock1.");
+                for (int i = 0; i < 5; i++) {
+                    System.out.println("In priority test2 : thread1" + " looped "
+                            + i + " times");
+                    KThread.currentThread().yield();
+                }
+            	lock1.release();
+            }       
+        };
+        final KThread t1 = new KThread(r1);
+        ThreadedKernel.scheduler.setPriority(t1, 1);
+        
+        t1.fork();
+       
+        t2.fork();
+        t3.fork();  
+       // t4.fork();
+        
+        t1.join();
+        t2.join();
+        t3.join();
+        //System.out.println("In priority test2 : back to main thread.");
+        //boolean intstatus = Machine.interrupt().disable();
+        //Machine.interrupt().restore(intstatus);
+        //t4.fork();
+        //t1.join();
+        //t3.join();
         t4.join();
     }
 }

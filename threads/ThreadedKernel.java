@@ -51,7 +51,7 @@ public class ThreadedKernel extends Kernel {
      */
     public void selfTest() {
     	Test.selfTest();
-        long seed;
+        /*long seed;
 //        seed = random.nextLong();
 //        seed = 6836154031344819769l;
 //        seed = 6543525100317173545l;
@@ -62,10 +62,9 @@ public class ThreadedKernel extends Kernel {
         seed = 8383159614660730322l; // for Cond2 test
 
         random.setSeed(seed);
-        System.err.printf("Random seed = %d\n", seed);
+        System.err.printf("Random seed = %d\n", seed);*/
 //        Lib.debug('X', String.format("Random seed = %d", seed));
 
-        Test.selfTest();
 //        Alarm.selfTest();
 //        CommunicatorTest.selfTest();
 //        Boat.selfTest();
