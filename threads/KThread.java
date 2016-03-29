@@ -513,7 +513,7 @@ public class KThread {
 
     {
         boolean intStatus = Machine.interrupt().disable();
-//        waitQueue.acquire(this);
+        waitQueue.acquire(this);
         Machine.interrupt().restore(intStatus);
     }
 }
