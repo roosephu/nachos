@@ -2,7 +2,6 @@ package nachos.threads;
 
 import nachos.machine.*;
 
-import javax.crypto.Mac;
 import java.util.*;
 
 /**
@@ -405,3 +404,173 @@ public class PriorityScheduler extends Scheduler {
         protected LinkedList<PriorityQueue> resourceList = new LinkedList<>();
     }
 }
+
+class InstructionsGenerator {
+
+    public class Operation {
+        int pid;
+        Runnable runnable;
+        boolean report = false;
+
+        Operation(int pid) {
+            this.pid = pid;
+        }
+
+        Operation acquire(Lock lock) {
+            runnable = new Runnable() {
+                @Override
+                public void run() {
+                    acquireTime[pid] = Machine.timer().getTime();
+                    lock.acquire();
+                }
+            };
+            return this;
+        }
+
+        Operation release(Lock lock) {
+            runnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (lock.isHeldByCurrentThread())
+                        lock.release();
+                }
+            };
+            return this;
+        }
+
+        Operation setReport() {
+            this.report = true;
+            return this;
+        }
+
+        Operation setPriority(int id, int priority) {
+            return this;
+        }
+
+        public boolean run(boolean shouldReport, int currentPid) {
+            if (shouldReport) {
+                threadReport(currentPid);
+            }
+            if (currentPid == pid || (pid < 0 && currentPid != 0)) {
+                runnable.run();
+            }
+            return report;
+        }
+    }
+
+    static final int numClients = 10;
+    static final long oneSecond = 10000000;
+
+    Random random = ThreadedKernel.random;
+    Lock[] locks = new Lock[numClients + 1];
+    LinkedList<Operation> operations;
+    long baseTime;
+    int[] fathers = new int[numClients + 1];
+    int[] priorities = new int[numClients + 1];
+    long[] acquireTime = new long[numClients + 1];
+    LinkedList<Integer> answers;
+
+    void threadReport(int pid) {
+        Lib.assertTrue(!answers.isEmpty());
+
+        int truth = answers.pollFirst();
+        Lib.assertTrue(truth == pid);
+    }
+
+    public InstructionsGenerator() {
+        baseTime = Machine.timer().getTime();
+        for (int i = 0; i <= numClients; ++i)
+            locks[i] = new Lock();
+        for (int i = 1; i <= numClients; ++i) {
+            priorities[i] = 1;
+            fathers[i] = -1;
+        }
+    }
+
+    boolean isAncestor(int fa, int ch) {
+        for (; fathers[ch] != -1 && ch != fa; ) {
+            ch = fathers[ch];
+        }
+        return ch == fa;
+    }
+
+    ArrayList<Integer> getReadyThreads() {
+        ArrayList<Integer> free = new ArrayList<>();
+        for (int i = 1; i <= numClients; ++i) {
+            if (fathers[i] == -1) {
+                free.add(i);
+            }
+        }
+        return free;
+    }
+
+    class Comp implements Comparator<Integer> {
+        public int compare(Integer a, Integer b) {
+            if (priorities[a] != priorities[b])
+                return priorities[b] - priorities[a];
+            return (int)(acquireTime[a] - acquireTime[b]);
+        }
+    }
+
+    void updateEffectivePriority() {
+
+    }
+
+    void generateOperation() {
+        ArrayList<Integer> free = getReadyThreads();
+        while (true) {
+            int b = random.nextInt(4);
+            if (b == 0) { // link
+                if (free.isEmpty())
+                    continue;
+
+                int u = free.get(random.nextInt(free.size()));
+
+                while (true) {
+                    int v = random.nextInt(numClients) + 1;
+                    if (!isAncestor(u, v)) {
+                        operations.add(new Operation(u).acquire(locks[v]));
+                        break;
+                    }
+                }
+            } else if (b == 1) { // run
+                operations.add(new Operation(0).acquire(locks[0]));
+                operations.add(new Operation(-1).acquire(locks[0]));
+                operations.add(new Operation(0).release(locks[0]).setReport());
+                operations.add(new Operation(-1).release(locks[0]));
+
+                updateEffectivePriority();
+                free.sort(new Comp());
+                for (int v : free)
+                    answers.push(v);
+                break;
+            } else if (b == 2) { // cut
+                int u = free.get(random.nextInt(free.size()));
+                operations.add(new Operation(u).release(locks[u]));
+                for (int i = 1; i <= numClients; ++i)
+                    if (fathers[i] == u)
+                        fathers[i] = -1;
+                break;
+            } else if (b == 3) { // set priority
+                int u = random.nextInt(numClients) + 1;
+                int p = random.nextInt(8);
+                operations.add(new Operation(0).setPriority(u, p));
+                priorities[u] = p;
+                break;
+            }
+        }
+    }
+
+    public Operation nextOperation() {
+        long currentTime = Machine.timer().getTime();
+        if (currentTime - baseTime > oneSecond) {
+            baseTime = currentTime;
+            operations.removeFirst();
+            if (operations.isEmpty()) {
+                generateOperation();
+            }
+        }
+        return operations.getFirst();
+    }
+}
+
