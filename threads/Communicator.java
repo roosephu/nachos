@@ -30,7 +30,7 @@ public class Communicator {
      * @param	word	the integer to transfer.
      */
     public void speak(int word) {
-        Lib.assertTrue(false);
+//        Lib.assertTrue(false);
         sharedLock.acquire(); // acquire the lock so that no speakers or audience can enter
 
         // We force the speaker to wait until an audience comes.
