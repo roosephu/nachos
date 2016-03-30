@@ -270,39 +270,6 @@ public class PriorityScheduler extends Scheduler {
          * @return the effective priority of the associated thread.
          */
         public int getEffectivePriority() {
-            effectivePriority = priority;
-            for (PriorityQueue queue : resourceList) {
-                if (queue.transferPriority) {
-                    Lib.assertTrue(queue.ownedThread == this);
-                    for (ThreadState threadState : queue.priorityQueue) {
-                        effectivePriority = Math.max(effectivePriority, threadState.getEffectivePriority());
-                    }
-                }
-            }
-
-            return effectivePriority;
-        }
-
-        /**
-         * Update effective priority.
-         * Use `ownedThread` chain to update all.
-         */
-        public void updateEffectivePriority() {
-//            boolean intStatus = Machine.interrupt().disable();
-//
-//            int oldSize = 0;
-//            if (waitingFor != null)
-//                oldSize = waitingFor.priorityQueue.size();
-//
-//            /**
-//             * The effective priority may change, so first we need to delete it from the
-//             * priority queue and after computing its new effective priority, we add it
-//             * back to the priority queue again.
-//             */
-//            if (waitingFor != null)
-//                Lib.assertTrue(waitingFor.priorityQueue.remove(this));
-//
-//            // Computing new effective priority
 //            effectivePriority = priority;
 //            for (PriorityQueue queue : resourceList) {
 //                if (queue.transferPriority) {
@@ -312,23 +279,58 @@ public class PriorityScheduler extends Scheduler {
 //                    }
 //                }
 //            }
-////            isValid = true;
-//
-//            int newSize = 0;
-//            if (waitingFor != null) {
-//                waitingFor.priorityQueue.add(this);
-//                newSize = waitingFor.priorityQueue.size();
-//
-//                // waitingFor.ownedThread may be null (ready queue)
-//                if (waitingFor.ownedThread != null && waitingFor.transferPriority) {
-//                    Lib.assertTrue(waitingFor.ownedThread != this);
-//
-//                    // Note that current thread is donating priority to another priority.
-//                    waitingFor.ownedThread.updateEffectivePriority();
-//                }
-//            }
-//            Lib.assertTrue(newSize == oldSize);
-//            Machine.interrupt().restore(intStatus);
+
+            return effectivePriority;
+        }
+
+        /**
+         * Update effective priority.
+         * Use `ownedThread` chain to update all.
+         */
+        public void updateEffectivePriority() {
+            boolean intStatus = Machine.interrupt().disable();
+
+            int oldSize = 0;
+            if (waitingFor != null)
+                oldSize = waitingFor.priorityQueue.size();
+
+            /**
+             * The effective priority may change, so first we need to delete it from the
+             * priority queue and after computing its new effective priority, we add it
+             * back to the priority queue again.
+             */
+            if (waitingFor != null)
+                Lib.assertTrue(waitingFor.priorityQueue.remove(this));
+
+            // Computing new effective priority
+            int oldEffectivePriority = effectivePriority;
+            effectivePriority = priority;
+            for (PriorityQueue queue : resourceList) {
+                if (queue.transferPriority) {
+                    Lib.assertTrue(queue.ownedThread == this);
+                    for (ThreadState threadState : queue.priorityQueue) {
+                        effectivePriority = Math.max(effectivePriority, threadState.getEffectivePriority());
+                    }
+                }
+            }
+//            isValid = true;
+
+            int newSize = 0;
+            if (waitingFor != null) {
+                waitingFor.priorityQueue.add(this);
+                newSize = waitingFor.priorityQueue.size();
+
+                // waitingFor.ownedThread may be null (ready queue)
+                if (waitingFor.ownedThread != null && waitingFor.transferPriority &&
+                        oldEffectivePriority != effectivePriority) {
+                    Lib.assertTrue(waitingFor.ownedThread != this);
+
+                    // Note that current thread is donating priority to another priority.
+                    waitingFor.ownedThread.updateEffectivePriority();
+                }
+            }
+            Lib.assertTrue(newSize == oldSize);
+            Machine.interrupt().restore(intStatus);
         }
 
         public void removeWaitingQueue(PriorityQueue waitQueue) {
