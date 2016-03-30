@@ -287,7 +287,10 @@ public class PriorityScheduler extends Scheduler {
          * Update effective priority.
          * Use `ownedThread` chain to update all.
          */
+        int depth = 0;
         public void updateEffectivePriority() {
+            depth += 1;
+            Lib.assertTrue(depth <= 1000);
             boolean intStatus = Machine.interrupt().disable();
 
             int oldSize = 0;
@@ -321,8 +324,7 @@ public class PriorityScheduler extends Scheduler {
                 newSize = waitingFor.priorityQueue.size();
 
                 // waitingFor.ownedThread may be null (ready queue)
-                if (waitingFor.ownedThread != null && waitingFor.transferPriority &&
-                        oldEffectivePriority != effectivePriority) {
+                if (waitingFor.ownedThread != null && waitingFor.transferPriority) {
                     Lib.assertTrue(waitingFor.ownedThread != this);
 
                     // Note that current thread is donating priority to another priority.
@@ -331,6 +333,7 @@ public class PriorityScheduler extends Scheduler {
             }
             Lib.assertTrue(newSize == oldSize);
             Machine.interrupt().restore(intStatus);
+            depth -= 1;
         }
 
         public void removeWaitingQueue(PriorityQueue waitQueue) {
@@ -362,6 +365,7 @@ public class PriorityScheduler extends Scheduler {
          *                  now waiting on.
          * @see nachos.threads.ThreadQueue#waitForAccess
          */
+
         public void waitForAccess(PriorityQueue waitQueue) {
 //            resourceList.add(waitQueue);
             Lib.debug('P', "process " + thread.getName() + " waiting for access " + waitQueue.toString());

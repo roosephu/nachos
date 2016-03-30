@@ -192,7 +192,10 @@ public class KThread {
 
         currentThread.status = statusFinished;
 
+        int loop = 0;
         while (true) {
+            loop += 1;
+            Lib.assertTrue(loop <= 1000);
             KThread thread = currentThread.waitQueue.nextThread();
             if (thread == null)
                 break;
