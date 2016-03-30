@@ -367,9 +367,9 @@ public class PriorityScheduler extends Scheduler {
 
             // may happen, e.g., ready queue when yielding
 //            Lib.assertTrue(waitQueue.ownedThread != this);
-            if (waitQueue.ownedThread == this) {
+            if (waitQueue.ownedThread == this && waitQueue.transferPriority) {
 //                Lib.debug('x', "wait queue " + waitQueue);
-//                Lib.assertTrue(false);
+                Lib.assertTrue(false);
             }
 
             // I'm waiting for some resource, thus I must donate my priority to the owner.
@@ -567,8 +567,8 @@ class InstructionsGenerator {
         }
     }
 
-    static final int numClients = 15;
-    static final int numLocks = 5;
+    static final int numClients = 100;
+    static final int numLocks = 20;
     static final long oneSecond = 10000;
 
     KThread[] threads = new KThread[numClients + 1];
