@@ -270,6 +270,16 @@ public class PriorityScheduler extends Scheduler {
          * @return the effective priority of the associated thread.
          */
         public int getEffectivePriority() {
+            effectivePriority = priority;
+            for (PriorityQueue queue : resourceList) {
+                if (queue.transferPriority) {
+                    Lib.assertTrue(queue.ownedThread == this);
+                    for (ThreadState threadState : queue.priorityQueue) {
+                        effectivePriority = Math.max(effectivePriority, threadState.getEffectivePriority());
+                    }
+                }
+            }
+
             return effectivePriority;
         }
 
@@ -666,7 +676,7 @@ class InstructionsGenerator {
         }
     }
 
-    void generateOperation1() {
+    void generateOperation() {
         ArrayList<Integer> free = getWaitThreads(-1);
         Lib.assertTrue(free.size() > 0);
         while (true) {
@@ -786,7 +796,7 @@ class InstructionsGenerator {
         answers.addLast(5);
     }
 
-    void generateOperation() {
+    void generateOperation3() {
         operations.add(new Operation(3).acquire(1));
         operations.add(new Operation(2).runSpecial1(1, 3));
         operations.add(new Operation(2).acquire(1));
