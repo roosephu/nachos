@@ -62,7 +62,7 @@ public class PriorityScheduler extends Scheduler {
         Lib.assertTrue(priority >= priorityMinimum &&
                 priority <= priorityMaximum);
 
-        Lib.debug('x', thread.getName() + " old: " + ThreadedKernel.scheduler.getPriority(thread) + " new: " + priority);
+//        Lib.debug('x', thread.getName() + " old: " + ThreadedKernel.scheduler.getPriority(thread) + " new: " + priority);
         getThreadState(thread).setPriority(priority);
     }
 
@@ -156,15 +156,18 @@ public class PriorityScheduler extends Scheduler {
             // The owned thread has finished everything it wants, so he is releasing resources.
             if (ownedThread != null) {
                 ownedThread.removeWaitingQueue(this);
+                ownedThread = null;
             }
 
             if (priorityQueue.isEmpty()) {
-                ownedThread = null;
                 return null;
             }
+//            Lib.assertTrue(false);
             ThreadState threadState = priorityQueue.poll();
+            Lib.assertTrue(threadState.waitingFor == this);
 
             ownedThread = threadState;
+            threadState.waitingFor = null;
             threadState.acquire(this);
             Lib.assertTrue(ownedThread.waitingFor != this);
 
@@ -215,7 +218,7 @@ public class PriorityScheduler extends Scheduler {
          * threads to the owning thread.
          */
         public boolean transferPriority;
-        public ThreadState ownedThread;
+        public ThreadState ownedThread = null;
 
         public java.util.PriorityQueue<ThreadState> priorityQueue = new java.util.PriorityQueue<>(new Comp());
     }
@@ -384,7 +387,6 @@ public class PriorityScheduler extends Scheduler {
              * for now). And all the threads waiting for this resource must donate
              * their priority to me.
              */
-            waitingFor = null;
             resourceList.add(waitQueue); // I will own the queue soon
 //            waitQueue.ownedThread = this;
 
@@ -431,6 +433,8 @@ class InstructionsGenerator {
                 public void run() {
                     acquireTime[currentPid] = Machine.timer().getTime();
                     locks[lock].acquire();
+//                    Lib.debug('z', String.format("process %d got lock %d", currentPid, lock));
+                    threadReport(currentPid);
                 }
             };
             self = String.format("process %d acquires lock %d", pid, lock);
@@ -472,7 +476,8 @@ class InstructionsGenerator {
             }
             if (currentPid == pid || (pid < 0 && currentPid != 0)) {
                 this.currentPid = currentPid;
-                Lib.debug('z', String.format("PC %d on proc %d: %s", this.pc, currentPid, self));
+                Lib.debug('z', String.format("[%d] PC %d on proc %d: %s", Machine.timer().getTime(), this.pc, currentPid, self));
+                Lib.assertTrue(this.pc == Machine.timer().getTime() / oneSecond);
                 runnable.run();
             }
             return report;
@@ -484,9 +489,9 @@ class InstructionsGenerator {
         }
     }
 
-    static final int numClients = 3;
-    static final int numLocks = 3;
-    static final long oneSecond = 1000000;
+    static final int numClients = 100;
+    static final int numLocks = 5;
+    static final long oneSecond = 10000;
 
     Random random = ThreadedKernel.random;
     Lock[] locks = new Lock[numLocks + 1];
@@ -504,6 +509,7 @@ class InstructionsGenerator {
         Lib.assertTrue(!answers.isEmpty());
 
         int truth = answers.pollFirst();
+        Lib.debug('z', String.format("Expect %d, got %d\n", truth, pid));
         Lib.assertTrue(truth == pid);
     }
 
@@ -520,11 +526,11 @@ class InstructionsGenerator {
     }
 
     boolean willDeadlock(int thread, int lock) {
-        for (; lockHolder[lock] != thread && lockHolder[lock] != -1; ) {
+        for (; lock != -1 && lockHolder[lock] != thread && lockHolder[lock] != -1; ) {
             lock = resourceWait[lockHolder[lock]];
-            Lib.assertTrue(lock != -1);
+//            Lib.assertTrue(lock != -1);
         }
-        return lockHolder[lock] == thread;
+        return lock == -1 || lockHolder[lock] == thread;
     }
 
     ArrayList<Integer> getWaitThreads(int lock) {
@@ -574,10 +580,12 @@ class InstructionsGenerator {
                     int lock = random.nextInt(numLocks) + 1;
                     if (!willDeadlock(u, lock)) {
                         operations.add(new Operation(u).acquire(lock));
-                        if (lockHolder[u] == -1)
+                        if (lockHolder[lock] == -1) {
                             lockHolder[lock] = u;
-                        else
+                            answers.addLast(u);
+                        } else {
                             resourceWait[u] = lock;
+                        }
                         return;
                     }
                 }
@@ -594,13 +602,15 @@ class InstructionsGenerator {
                 break;
             } else if (b == 2) { // release
                 int u = free.get(random.nextInt(free.size()));
-                if (resourceWait[u] == -1)
+                if (resourceWait[u] != -1)
                     continue;
 
                 ArrayList<Integer> holdingLocks = new ArrayList<>();
                 for (int i = 1; i <= numLocks; ++i)
                     if (lockHolder[i] == u)
                         holdingLocks.add(i);
+                if (holdingLocks.isEmpty())
+                    continue;
 
                 int lock = holdingLocks.get(random.nextInt(holdingLocks.size()));
 
@@ -608,12 +618,21 @@ class InstructionsGenerator {
                 Lib.assertTrue(lockHolder[lock] == u);
 
                 updateEffectivePriority();
-                free.sort(new Comp());
-                int newHolder = free.get(0);
-                lockHolder[lock] = newHolder;
-                resourceWait[newHolder] = -1;
+
+                free = getWaitThreads(lock);
+                if (free.isEmpty()) {
+                    lockHolder[lock] = -1;
+                } else {
+                    free.sort(new Comp());
+                    int newHolder = free.get(0);
+                    lockHolder[lock] = newHolder;
+                    resourceWait[newHolder] = -1;
+                    answers.addLast(newHolder);
+                }
                 break;
             } else if (b == 3) { // set priority
+                if (random.nextInt(10) != 0)
+                    continue;
                 int u = random.nextInt(numClients) + 1;
                 int p = random.nextInt(8);
                 operations.add(new Operation(0).setPriority(u, p));
@@ -623,10 +642,19 @@ class InstructionsGenerator {
         }
     }
 
+    void generateOperation2() {
+        operations.add(new Operation(1).acquire(1));
+        operations.add(new Operation(2).acquire(2));
+        operations.add(new Operation(2).acquire(1));
+        operations.add(new Operation(3).acquire(2));
+        answers.addLast(1);
+        answers.addLast(2);
+    }
+
     public Operation nextOperation() {
         long currentTime = Machine.timer().getTime();
 
-        if (currentTime - baseTime > oneSecond) {
+        if (currentTime / oneSecond != baseTime / oneSecond) {
             baseTime = currentTime;
             operations.removeFirst();
         }
@@ -638,6 +666,11 @@ class InstructionsGenerator {
 
 class UniversalSchedulerTest {
     static InstructionsGenerator generator;
+
+    static long toNextSecond() {
+        long cur = Machine.timer().getTime();
+        return (cur / generator.oneSecond + 1) * generator.oneSecond - cur;
+    }
 
     static class Client implements Runnable {
         int pid;
@@ -651,7 +684,7 @@ class UniversalSchedulerTest {
             while (true) {
                 InstructionsGenerator.Operation op = generator.nextOperation();
                 shouldReport = op.run(shouldReport, pid);
-                ThreadedKernel.alarm.waitUntil(InstructionsGenerator.oneSecond);
+                ThreadedKernel.alarm.waitUntil(toNextSecond());
             }
         }
     }

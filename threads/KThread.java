@@ -190,14 +190,14 @@ public class KThread {
         Lib.assertTrue(toBeDestroyed == null);
         toBeDestroyed = currentThread;
 
-        while (currentThread.waitQueue != null) {
+        currentThread.status = statusFinished;
+
+        while (true) {
             KThread thread = currentThread.waitQueue.nextThread();
             if (thread == null)
                 break;
             thread.ready();
         }
-
-        currentThread.status = statusFinished;
 
         sleep();
     }
@@ -283,14 +283,7 @@ public class KThread {
         Lib.assertTrue(this != currentThread);
 
         boolean initStatus = Machine.interrupt().disable();
-        if (waitQueue == null) {
-            waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-            waitQueue.acquire(this);
-        }
-        if (status == statusFinished) {
-
-        }
-        else {
+        if (status != statusFinished) {
             waitQueue.waitForAccess(currentThread);
             currentThread.sleep();
         }
@@ -421,14 +414,58 @@ public class KThread {
     /**
      * Tests whether this module is working.
      */
-    public static void selfTest() {
+    public static void selfTest2() {
         Lib.debug(dbgThread, "Enter KThread.selfTest");
 
         new KThread(new PingTest(1)).setName("forked thread").fork();
         // new KThread(new PingTest(3)).setName("forked thread 2").fork();
         new PingTest(0).run();
     }
-    
+
+    public static void selfTest() {
+        Lock lock1 = new Lock();
+        Lock lock2 = new Lock();
+
+        KThread thread1 = new KThread(new Runnable() {
+            @Override
+            public void run() {
+                lock1.acquire();
+                Lib.debug('x', "t1 lock 1 got.");
+                ThreadedKernel.alarm.waitUntil(1000000);
+                lock1.release();
+                Lib.debug('x', "t1 lock 1 released.");
+            }
+        });
+        KThread thread2 = new KThread(new Runnable() {
+            @Override
+            public void run() {
+                lock2.acquire();
+                Lib.debug('x', "t2 lock 2 got.");
+                lock1.acquire();
+                Lib.debug('x', "t2 lock 1 got.");
+                lock1.release();
+                Lib.debug('x', "t2 lock 1 release.");
+                lock2.release();
+                Lib.debug('x', "t2 lock 2 release.");
+            }
+        });
+
+        KThread thread3 = new KThread(new Runnable() {
+            @Override
+            public void run() {
+                thread2.join();
+                Lib.debug('x', "joined t2");
+            }
+        });
+
+        thread1.fork();
+        thread2.fork();
+        thread3.fork();
+        thread1.join();
+        thread2.join();
+        thread3.join();
+    }
+
     private static final char dbgThread = 't';
 
     /**
@@ -472,5 +509,11 @@ public class KThread {
     /**
      * our code
      */
-    private ThreadQueue waitQueue = null;
+    private ThreadQueue waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+
+    {
+        boolean intStatus = Machine.interrupt().disable();
+        waitQueue.acquire(this);
+        Machine.interrupt().restore(intStatus);
+    }
 }
