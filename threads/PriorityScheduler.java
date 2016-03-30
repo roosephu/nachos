@@ -134,7 +134,10 @@ public class PriorityScheduler extends Scheduler {
             Lib.assertTrue(Machine.interrupt().disabled());
             ThreadState threadState = getThreadState(thread);
 
-            threadState.updateTime();
+//            threadState.updateTime();
+            totalTicks += 1;
+            threadState.startTime = totalTicks;
+            Lib.assertTrue(!priorityQueue.remove(threadState));
             priorityQueue.add(threadState);
 
             // must run after priorityQueue.add
@@ -150,7 +153,7 @@ public class PriorityScheduler extends Scheduler {
         }
 
         public KThread nextThread() {
-            Lib.debug('p', "Did you called me?");
+            Lib.debug('p', "Did you call me?");
             Lib.assertTrue(Machine.interrupt().disabled());
 
             // The owned thread has finished everything it wants, so he is releasing resources.
@@ -165,9 +168,9 @@ public class PriorityScheduler extends Scheduler {
 //            Lib.assertTrue(false);
             ThreadState threadState = priorityQueue.poll();
             Lib.assertTrue(threadState.waitingFor == this);
+            threadState.waitingFor = null;
 
             ownedThread = threadState;
-            threadState.waitingFor = null;
             threadState.acquire(this);
             Lib.assertTrue(ownedThread.waitingFor != this);
 
@@ -220,6 +223,7 @@ public class PriorityScheduler extends Scheduler {
         public boolean transferPriority;
         public ThreadState ownedThread = null;
 
+        int totalTicks = 0;
         public java.util.PriorityQueue<ThreadState> priorityQueue = new java.util.PriorityQueue<>(new Comp());
     }
 
@@ -773,7 +777,7 @@ class UniversalSchedulerTest {
 
     static long toNextSecond() {
         long cur = Machine.timer().getTime();
-        return (cur / generator.oneSecond + 1) * generator.oneSecond - cur;
+        return (cur / InstructionsGenerator.oneSecond + 1) * InstructionsGenerator.oneSecond - cur;
     }
 
     static class Client implements Runnable {
@@ -799,13 +803,13 @@ class UniversalSchedulerTest {
 //        ThreadedKernel.alarm.waitUntil(generator.oneSecond);
 //        Lib.debug('x', "after one second");
 
-        for (int i = 0; i <= generator.numClients; ++i) {
+        for (int i = 0; i <= InstructionsGenerator.numClients; ++i) {
             generator.threads[i] = new KThread(new Client(i)).setName("P" + i);
         }
-        for (int i = 0; i <= generator.numClients; ++i) {
+        for (int i = 0; i <= InstructionsGenerator.numClients; ++i) {
             generator.threads[i].fork();
         }
-        for (int i = 1; i <= generator.numClients; ++i) {
+        for (int i = 1; i <= InstructionsGenerator.numClients; ++i) {
             generator.threads[i].join();
         }
         Lib.debug('z', "finished");
