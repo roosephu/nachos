@@ -207,6 +207,7 @@ public class PriorityScheduler extends Scheduler {
 //                }
                 if (diff != 0)
                     return -diff;
+                Lib.assertTrue(a.startTime != b.startTime);
 
                 if (a.startTime > b.startTime)
                     return 1;
@@ -225,6 +226,7 @@ public class PriorityScheduler extends Scheduler {
 
         int totalTicks = 0;
         public java.util.PriorityQueue<ThreadState> priorityQueue = new java.util.PriorityQueue<>(new Comp());
+
     }
 
     /**
@@ -244,14 +246,14 @@ public class PriorityScheduler extends Scheduler {
         public ThreadState(KThread thread) {
             this.thread = thread;
 
-            updateTime();
+//            updateTime();
             setPriority(priorityDefault);
             updateEffectivePriority();
         }
 
-        public void updateTime() {
-            startTime = Machine.timer().getTime();
-        }
+//        public void updateTime() {
+//            startTime = Machine.timer().getTime();
+//        }
 
         /**
          * Return the priority of the associated thread.
@@ -353,12 +355,16 @@ public class PriorityScheduler extends Scheduler {
             Lib.debug('P', "process " + thread.getName() + " waiting for access " + waitQueue.toString());
             Lib.assertTrue(waitingFor == null);
 
-            // may happen, e.g., ready queue
-//             Lib.assertTrue(waitQueue.ownedThread != this);
+            // may happen, e.g., ready queue when yielding
+//            Lib.assertTrue(waitQueue.ownedThread != this);
+            if (waitQueue.ownedThread == this) {
+//                Lib.debug('x', "wait queue " + waitQueue);
+//                Lib.assertTrue(false);
+            }
 
             // I'm waiting for some resource, thus I must donate my priority to the owner.
             waitingFor = waitQueue;
-            if (waitingFor != null && waitingFor.ownedThread != null) // and then update its effective priority
+            if (waitingFor.ownedThread != null && waitingFor.transferPriority) // and then update its effective priority
                 waitingFor.ownedThread.updateEffectivePriority();
 //            setInvalid();
         }
@@ -400,11 +406,18 @@ public class PriorityScheduler extends Scheduler {
              * for now). And all the threads waiting for this resource must donate
              * their priority to me.
              */
+            Lib.assertTrue(!resourceList.remove(waitQueue));
             resourceList.add(waitQueue); // I will own the queue soon
 //            waitQueue.ownedThread = this;
 
             updateEffectivePriority();
 //            isValid = false;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Process %s [priority = %d, effective = %d, time = %d] ",
+                    thread.getName(), priority, effectivePriority, startTime);
         }
 
         /**
@@ -510,6 +523,19 @@ class InstructionsGenerator {
             return this;
         }
 
+        Operation runSpecial1(int id, int priority) {
+            runnable = new Runnable() {
+                @Override
+                public void run() {
+                    boolean intStatus = Machine.interrupt().disable();
+                    ThreadedKernel.scheduler.setPriority(threads[id], priority);
+                    Machine.interrupt().restore(intStatus);
+                    KThread.yield();
+                }
+            };
+            return this;
+        }
+
         public boolean run(boolean shouldReport, int currentPid) {
             if (shouldReport && currentPid != 0) {
                 threadReport(currentPid);
@@ -531,8 +557,8 @@ class InstructionsGenerator {
         }
     }
 
-    static final int numClients = 100;
-    static final int numLocks = 10;
+    static final int numClients = 15;
+    static final int numLocks = 5;
     static final long oneSecond = 10000;
 
     KThread[] threads = new KThread[numClients + 1];
@@ -640,7 +666,7 @@ class InstructionsGenerator {
         }
     }
 
-    void generateOperation() {
+    void generateOperation1() {
         ArrayList<Integer> free = getWaitThreads(-1);
         Lib.assertTrue(free.size() > 0);
         while (true) {
@@ -714,7 +740,8 @@ class InstructionsGenerator {
                     continue;
 
                 int p = random.nextInt(8);
-                operations.add(new Operation(0).setPriority(u, p));
+                int active = free.get(random.nextInt(free.size()));
+                operations.add(new Operation(active).setPriority(u, p));
                 priorities[u] = p;
                 return;
             } else if (b == 4) {
@@ -757,6 +784,13 @@ class InstructionsGenerator {
         answers.addLast(2);
 //        answers.addLast(2);
         answers.addLast(5);
+    }
+
+    void generateOperation() {
+        operations.add(new Operation(3).acquire(1));
+        operations.add(new Operation(2).runSpecial1(1, 3));
+        operations.add(new Operation(2).acquire(1));
+        operations.add(new Operation(2).acquire(1));
     }
 
     public Operation nextOperation() {

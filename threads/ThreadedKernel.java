@@ -62,6 +62,8 @@ public class ThreadedKernel extends Kernel {
 //        seed = 8383159614660730322l; // for Cond2 test
 //        seed = -6444553281654560242l;
 //        seed = -3954020395626546001l;
+//        seed = -7316380266559853960l;
+//        seed = -7316380266559853960l;
 
         random.setSeed(seed);
         System.err.printf("Random seed = %d\n", seed);
