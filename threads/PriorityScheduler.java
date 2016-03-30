@@ -430,7 +430,7 @@ public class PriorityScheduler extends Scheduler {
             updateEffectivePriority();
 //            isValid = false;
         }
-
+        
         @Override
         public String toString() {
             return String.format("Process %s [priority = %d, effective = %d, time = %d] ",
