@@ -324,7 +324,8 @@ public class PriorityScheduler extends Scheduler {
                 newSize = waitingFor.priorityQueue.size();
 
                 // waitingFor.ownedThread may be null (ready queue)
-                if (waitingFor.ownedThread != null && waitingFor.transferPriority) {
+                if (waitingFor.ownedThread != null && waitingFor.transferPriority &&
+                        oldEffectivePriority != effectivePriority) {
                     Lib.assertTrue(waitingFor.ownedThread != this);
 
                     // Note that current thread is donating priority to another priority.

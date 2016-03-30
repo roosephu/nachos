@@ -339,9 +339,9 @@ public class PriorityTest {
         Lib.assertTrue(ThreadedKernel.scheduler.getClass().getSimpleName().equals(
                 "PriorityScheduler"), "This grader needs priority scheduler.");
 
-        testLock();
+//        testLock();
 
-        testJoin();
+//        testJoin();
 
     }
 
@@ -394,7 +394,7 @@ public class PriorityTest {
             {
                 alwaysYield();
             }
-        });
+        }).setName("low");
         ThreadedKernel.scheduler.setPriority(lowThread, lowPriority);
         lowThread.fork();
         KThread midThread1 = new KThread(new Runnable()
@@ -405,7 +405,7 @@ public class PriorityTest {
                 alwaysYield();
                 Lib.assertTrue(false, "Maybe error in your priority donation.");
             }
-        });
+        }).setName("mid");
         ThreadedKernel.scheduler.setPriority(midThread1, midPriority);
         midThread1.fork();
         Machine.interrupt().restore(insStatus);
@@ -418,6 +418,7 @@ public class PriorityTest {
         {
             KThread.yield();
         }
+//        Lib.assertTrue(false);
     }
 
     public static final int highPriority = PriorityScheduler.priorityMaximum;
