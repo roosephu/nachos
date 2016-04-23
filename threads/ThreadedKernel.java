@@ -73,15 +73,15 @@ public class ThreadedKernel extends Kernel {
 //        PriorityTest.selfTest3();
 //        PriorityTest.selfTest4();
 //          PriorityTest.selfTest5();
-        Alarm.selfTest();
-        CommunicatorTest.selfTest();
-        Boat.selfTest();
-        KThread.selfTest();
-        Semaphore.selfTest();
-        SynchList.selfTest();
-        if (Machine.bank() != null) {
-            ElevatorBank.selfTest();
-        }
+//        Alarm.selfTest();
+//        CommunicatorTest.selfTest();
+//        Boat.selfTest();
+//        KThread.selfTest();
+//        Semaphore.selfTest();
+//        SynchList.selfTest();
+//        if (Machine.bank() != null) {
+//            ElevatorBank.selfTest();
+//        }
     }
 
     /**

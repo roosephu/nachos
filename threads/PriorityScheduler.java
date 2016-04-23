@@ -2,7 +2,6 @@ package nachos.threads;
 
 import nachos.machine.*;
 
-import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -140,7 +139,7 @@ public class PriorityScheduler extends Scheduler {
             Lib.assertTrue(!priorityQueue.remove(threadState));
             priorityQueue.add(threadState);
 
-            // must run after priorityQueue.add
+            // must run after queue.add
             // otherwise updateEffectivePriority can add it twice (first deletion fails)
             threadState.waitForAccess(this);
         }
@@ -274,7 +273,7 @@ public class PriorityScheduler extends Scheduler {
 //            for (PriorityQueue queue : resourceList) {
 //                if (queue.transferPriority) {
 //                    Lib.assertTrue(queue.ownedThread == this);
-//                    for (ThreadState threadState : queue.priorityQueue) {
+//                    for (ThreadState threadState : queue.queue) {
 //                        effectivePriority = Math.max(effectivePriority, threadState.getEffectivePriority());
 //                    }
 //                }
