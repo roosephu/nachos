@@ -1,13 +1,11 @@
 package nachos.userprog;
 
-import com.sun.javafx.binding.StringFormatter;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
-import javax.crypto.Mac;
 import java.io.EOFException;
-import java.util.HashMap;
+import java.util.LinkedList;
 
 class FileDescriptorList {
     private OpenFile[] fd;
@@ -25,7 +23,7 @@ class FileDescriptorList {
     }
 
     public OpenFile get(int id) {
-        Lib.assertTrue(fd[id] != null, "empty fd set when getting");
+//        Lib.assertTrue(fd[id] != null, "empty fd set when getting");
         return fd[id];
     }
 
@@ -62,9 +60,12 @@ public class UserProcess {
 //        for (int i = 0; i < numPhysPages; i++)
 //            pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
 
-        fileDescriptorList = new FileDescriptorList(16);
+        fileDescriptorList = new FileDescriptorList(maxOpenedFile);
         fileDescriptorList.set(0, UserKernel.console.openForReading());
         fileDescriptorList.set(1, UserKernel.console.openForWriting());
+
+        numProcesses += 1;
+        processId = numProcesses;
     }
 
     /**
@@ -90,7 +91,10 @@ public class UserProcess {
         if (!load(name, args))
             return false;
 
-        new UThread(this).setName(name).fork();
+        UThread thread = new UThread(this);
+        if (mainThread == null)
+            mainThread = thread;
+        thread.setName(name).fork();
 
         return true;
     }
@@ -384,6 +388,16 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+        for (int i = 0; i < numPages; ++i) {
+            int ppn = pageTable[i].ppn;
+            UserKernel.freePage(ppn);
+        }
+        for (int i = 0; i < maxOpenedFile; ++i) {
+            OpenFile file = fileDescriptorList.get(i);
+            if (file != null) {
+                file.close();
+            }
+        }
     }
 
     /**
@@ -414,6 +428,9 @@ public class UserProcess {
      */
     private int handleHalt() {
 
+        if (processId != 1) { // the first process
+            return -1;
+        }
         Machine.halt();
 
         Lib.assertNotReached("Machine.halt() did not halt machine!");
@@ -421,11 +438,66 @@ public class UserProcess {
     }
 
     private int handleExit(int status) {
-        return 0;
+        int ret = -1;
+        try {
+            exitCode = status;
+            unloadSections();
+
+            for (UserProcess child : children) {
+                child.parent = null;
+            }
+
+            ret = 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
     }
 
-    private int handleExec(int name, int argc, int argv) {
-        return 0;
+    private int handleJoin(int pid, int retStatusAddr) {
+        int ret = -1;
+        try {
+            UserProcess childProcess = null;
+            for (UserProcess child : children) {
+                if (child.processId == pid) {
+                    childProcess = child;
+                    break;
+                }
+            }
+            Lib.assertTrue(childProcess != null);
+            childProcess.mainThread.join();
+
+            ret = 1;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
+    }
+
+    private int handleExec(int nameAddr, int argc, int argvAddr) {
+        int ret = -1;
+
+        try {
+            String filename = readVirtualMemoryString(nameAddr, 256);
+            String[] argv = new String[argc];
+            for (int i = 0; i < argc; ++i) {
+                byte[] curArg = new byte[4];
+                readVirtualMemory(argvAddr, curArg);
+
+                int argAddress = Lib.bytesToInt(curArg, 0);
+
+                argv[i] = readVirtualMemoryString(argAddress, 256);
+            }
+            UserProcess child = newUserProcess();
+            child.parent = this;
+            Lib.assertTrue(child.execute(filename, argv));
+            children.add(child);
+
+            ret = child.processId; // TODO return pid here
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
     }
 
     private int handleCreate(int filenameAddr) {
@@ -435,6 +507,7 @@ public class UserProcess {
             int fd = fileDescriptorList.getFreeFD();
             OpenFile file = UserKernel.fileSystem.open(filename, true);
             fileDescriptorList.set(fd, file);
+            Lib.assertTrue(UserKernel.fileReference.open(filename));
 
             ret = -1;
         } catch (Exception e) {
@@ -450,6 +523,7 @@ public class UserProcess {
             int fd = fileDescriptorList.getFreeFD();
             OpenFile file = UserKernel.fileSystem.open(filename, false);
             fileDescriptorList.set(fd, file);
+            Lib.assertTrue(UserKernel.fileReference.open(filename));
 
             ret = 0;
         } catch (Exception e) {
@@ -492,6 +566,7 @@ public class UserProcess {
             OpenFile file = fileDescriptorList.get(fd);
             file.close();
             fileDescriptorList.free(fd);
+            UserKernel.fileReference.close(file.getName());
 
             ret = 0;
         } catch (Exception e) {
@@ -505,6 +580,7 @@ public class UserProcess {
         try {
             String filename = readVirtualMemoryString(name, 256);
             UserKernel.fileSystem.remove(filename);
+            UserKernel.fileReference.remove(filename);
 
             ret = 0;
         } catch (Exception e) {
@@ -563,6 +639,9 @@ public class UserProcess {
 
             case syscallExec:
                 return handleExec(a0, a1, a2);
+
+            case syscallJoin:
+                return handleJoin(a0, a1);
 
             case syscallCreate:
                 return handleCreate(a0);
@@ -643,7 +722,16 @@ public class UserProcess {
 
     private FileDescriptorList fileDescriptorList;
 
+    private int processId;
+    private static int numProcesses = 0;
+
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+    public static final int maxOpenedFile = 16;
 
+    private LinkedList<UserProcess> children = new LinkedList<>();
+    private UserProcess parent = null;
+    private UThread mainThread = null;
+
+    private int exitCode = 0;
 }

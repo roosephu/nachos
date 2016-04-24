@@ -2,8 +2,8 @@ package nachos.userprog;
 
 import nachos.machine.*;
 import nachos.threads.*;
-import nachos.userprog.*;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 
 /**
@@ -36,7 +36,7 @@ public class UserKernel extends ThreadedKernel {
         int[] pages = new int[Machine.processor().getNumPhysPages()];
         for (int i = 0; i < Machine.processor().getNumPhysPages(); ++i)
             pages[i] = i;
-        for (int i = 1; i < pages.length && i < 10; ++i) {
+        for (int i = 1; i < pages.length; ++i) {
             int j = Lib.random(i + 1);
             if (i != j) {
                 int x = pages[i];
@@ -47,6 +47,61 @@ public class UserKernel extends ThreadedKernel {
         freePages = new LinkedList<>();
         for (int i = 0; i < pages.length; ++i)
             freePages.add(pages[i]);
+
+        fileReference = new FileReference();
+    }
+
+    class FileReference {
+        HashMap<String, OpenedFile> map = new HashMap<>();
+        public class OpenedFile {
+            String file;
+            boolean willDelete = false;
+            int count = 1;
+
+            public OpenedFile(String file) {
+                this.file = file;
+            }
+        }
+
+        public boolean open(String file) {
+            if (map.containsKey(file)) {
+                OpenedFile openedFile = map.get(file);
+                if (openedFile.willDelete)
+                    return false;
+                openedFile.count += 1;
+            } else {
+                map.put(file, new OpenedFile(file));
+            }
+            return true;
+        }
+
+        public void close(String file) {
+            Lib.assertTrue(map.containsKey(file));
+            OpenedFile openedFile = map.get(file);
+            Lib.assertTrue(openedFile.count > 0);
+            openedFile.count -= 1;
+            if (openedFile.count == 0) {
+                if (openedFile.willDelete) {
+                    openedFile.willDelete = false;
+                    UserKernel.fileSystem.remove(file);
+                }
+                map.remove(file);
+            }
+        }
+
+        public boolean remove(String file) {
+            if (!map.containsKey(file)) {
+                return true;
+            }
+            OpenedFile openedFile = map.get(file);
+            openedFile.count -= 1;
+            if (openedFile.count == 0) {
+                UserKernel.fileSystem.remove(file);
+            } else {
+                openedFile.willDelete = true;
+            }
+            return true;
+        }
     }
 
     /**
@@ -145,4 +200,5 @@ public class UserKernel extends ThreadedKernel {
     private static Coff dummy1 = null;
 
     private static LinkedList<Integer> freePages;
+    public static FileReference fileReference;
 }
