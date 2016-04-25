@@ -66,6 +66,7 @@ public class UserProcess {
 
         numProcesses += 1;
         processId = numProcesses;
+        ++runningProcesses;
     }
 
     /**
@@ -444,8 +445,14 @@ public class UserProcess {
             unloadSections();
 
             for (UserProcess child : children) {
-                child.parent = null;
+//                child.parent = null;
             }
+
+            --runningProcesses;
+            if (runningProcesses == 0)
+                Machine.terminate();
+            else
+                UThread.finish();
 
             ret = 0;
         } catch (Exception e) {
@@ -489,7 +496,7 @@ public class UserProcess {
                 argv[i] = readVirtualMemoryString(argAddress, 256);
             }
             UserProcess child = newUserProcess();
-            child.parent = this;
+//            child.parent = this;
             Lib.assertTrue(child.execute(filename, argv));
             children.add(child);
 
@@ -724,13 +731,13 @@ public class UserProcess {
 
     private int processId;
     private static int numProcesses = 0;
+    private static int runningProcesses = 0;
 
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
     public static final int maxOpenedFile = 16;
 
     private LinkedList<UserProcess> children = new LinkedList<>();
-    private UserProcess parent = null;
     private UThread mainThread = null;
 
     private int exitCode = 0;
