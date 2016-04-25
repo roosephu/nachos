@@ -450,7 +450,7 @@ public class UserProcess {
 
             --runningProcesses;
             if (runningProcesses == 0)
-                Machine.terminate();
+                Kernel.kernel.terminate();
             else
                 UThread.finish();
 
@@ -473,6 +473,9 @@ public class UserProcess {
             }
             Lib.assertTrue(childProcess != null);
             childProcess.mainThread.join();
+
+            byte[] exitBytes = Lib.bytesFromInt(childProcess.exitCode);
+            writeVirtualMemory(retStatusAddr, exitBytes);
 
             ret = 1;
         } catch (Exception e) {

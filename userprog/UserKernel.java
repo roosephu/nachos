@@ -177,11 +177,16 @@ public class UserKernel extends ThreadedKernel {
 
     public static int allocPage() {
         Lib.assertTrue(!freePages.isEmpty());
-        return freePages.poll();
+        pageLock.acquire();
+        int page = freePages.poll();
+        pageLock.release();
+        return page;
     }
 
     public static void freePage(int ppn) {
+        pageLock.acquire();
         freePages.add(ppn);
+        pageLock.release();
     }
 
     /**
@@ -201,4 +206,6 @@ public class UserKernel extends ThreadedKernel {
 
     private static LinkedList<Integer> freePages;
     public static FileReference fileReference;
+
+    private static Lock pageLock = new Lock();
 }
