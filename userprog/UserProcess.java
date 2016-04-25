@@ -497,7 +497,10 @@ public class UserProcess {
             byte[] exitBytes = Lib.bytesFromInt(childProcess.exitCode);
             writeVirtualMemory(retStatusAddr, exitBytes);
 
-            ret = 1;
+            if (childProcess.unexpectedException != NO_EXCEPTION)
+                ret = 0;
+            else
+                ret = 1;
         } catch (SyscallException e) {
             e.printStackTrace();
         }
@@ -726,6 +729,8 @@ public class UserProcess {
             default:
                 Lib.debug(dbgProcess, "Unexpected exception: " +
                         Processor.exceptionNames[cause]);
+                unexpectedException = cause;
+                handleExit(0);
                 Lib.assertNotReached("Unexpected exception");
         }
     }
@@ -766,4 +771,7 @@ public class UserProcess {
     private UThread mainThread = null;
 
     private int exitCode = 0;
+
+    public int NO_EXCEPTION = -1;
+    private int unexpectedException = NO_EXCEPTION;
 }
