@@ -25,6 +25,7 @@ public class UserKernel extends ThreadedKernel {
         super.initialize(args);
 
         console = new SynchConsole(Machine.console());
+        pageLock = new Lock();
 
         Machine.processor().setExceptionHandler(new Runnable() {
             public void run() {
@@ -112,6 +113,11 @@ public class UserKernel extends ThreadedKernel {
 
         System.out.println("Testing the console device. Typed characters");
         System.out.println("will be echoed until q is typed.");
+
+//        UserProcess process = UserProcess.newUserProcess();
+
+//        Lib.assertTrue(process.execute("cat.coff", new String[]{"cat", "cp.c"}));
+
 //
 //	char c;
 //
@@ -207,5 +213,5 @@ public class UserKernel extends ThreadedKernel {
     private static LinkedList<Integer> freePages;
     public static FileReference fileReference;
 
-    private static Lock pageLock = new Lock();
+    private static Lock pageLock;
 }

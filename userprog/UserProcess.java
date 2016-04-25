@@ -18,7 +18,7 @@ class FileDescriptorList {
         for (int i = 0; i < fd.length; ++i)
             if (fd[i] == null)
                 return i;
-        Lib.assertTrue(false, "No Free File Description");
+//        SyscallException.check(false, "No Free File Description");
         return 0;
     }
 
@@ -28,13 +28,32 @@ class FileDescriptorList {
     }
 
     public void set(int id, OpenFile file) {
-        Lib.assertTrue(fd[id] == null, "non-empty fd when setting");
+//        SyscallException.check(fd[id] == null, "non-empty fd when setting");
         fd[id] = file;
     }
 
     public void free(int id) {
-        Lib.assertTrue(fd[id] != null, "empty fd");
+//        SyscallException.check(fd[id] != null, "empty fd");
         fd[id] = null;
+    }
+}
+
+class SyscallException extends Exception {
+
+    public SyscallException(String message) {
+        super(message);
+    }
+
+    public static void check(boolean b) throws SyscallException {
+        if (!b) {
+            throw new SyscallException("");
+        }
+    }
+
+    public static void check(boolean b, String message) throws SyscallException {
+        if (!b) {
+            throw new SyscallException(message);
+        }
     }
 }
 
@@ -373,7 +392,7 @@ public class UserProcess {
             for (int i = 0; i < section.getLength(); i++) {
                 int vpn = section.getFirstVPN() + i;
                 int ppn = UserKernel.allocPage();
-                Lib.debug('o', String.format("allocating VP %d", vpn));
+//                Lib.debug('o', String.format("allocating VP %d", vpn));
 
                 pageTable[vpn] = new TranslationEntry(vpn, ppn, true, section.isReadOnly(), false, false);
 
@@ -444,9 +463,9 @@ public class UserProcess {
             exitCode = status;
             unloadSections();
 
-            for (UserProcess child : children) {
+//            for (UserProcess child : children) {
 //                child.parent = null;
-            }
+//            }
 
             --runningProcesses;
             if (runningProcesses == 0)
@@ -471,14 +490,15 @@ public class UserProcess {
                     break;
                 }
             }
-            Lib.assertTrue(childProcess != null);
+            SyscallException.check(childProcess != null);
+//            Lib.assertTrue(childProcess != null);
             childProcess.mainThread.join();
 
             byte[] exitBytes = Lib.bytesFromInt(childProcess.exitCode);
             writeVirtualMemory(retStatusAddr, exitBytes);
 
             ret = 1;
-        } catch (Exception e) {
+        } catch (SyscallException e) {
             e.printStackTrace();
         }
         return ret;
@@ -489,22 +509,25 @@ public class UserProcess {
 
         try {
             String filename = readVirtualMemoryString(nameAddr, 256);
+            SyscallException.check(0 <= argc && argc < 256);
             String[] argv = new String[argc];
             for (int i = 0; i < argc; ++i) {
                 byte[] curArg = new byte[4];
-                readVirtualMemory(argvAddr, curArg);
+                readVirtualMemory(argvAddr + i * 4, curArg);
 
                 int argAddress = Lib.bytesToInt(curArg, 0);
 
                 argv[i] = readVirtualMemoryString(argAddress, 256);
             }
             UserProcess child = newUserProcess();
-//            child.parent = this;
-            Lib.assertTrue(child.execute(filename, argv));
             children.add(child);
+//            child.parent = this;
+            if (!child.execute(filename, argv))
+                ret = -1;
+            else
+                ret = child.processId;
 
-            ret = child.processId; // TODO return pid here
-        } catch (Exception e) {
+        } catch (SyscallException e) {
             e.printStackTrace();
         }
         return ret;
@@ -517,10 +540,10 @@ public class UserProcess {
             int fd = fileDescriptorList.getFreeFD();
             OpenFile file = UserKernel.fileSystem.open(filename, true);
             fileDescriptorList.set(fd, file);
-            Lib.assertTrue(UserKernel.fileReference.open(filename));
+            SyscallException.check(UserKernel.fileReference.open(filename));
 
             ret = -1;
-        } catch (Exception e) {
+        } catch (SyscallException e) {
             e.printStackTrace();
         }
         return ret;
@@ -533,10 +556,10 @@ public class UserProcess {
             int fd = fileDescriptorList.getFreeFD();
             OpenFile file = UserKernel.fileSystem.open(filename, false);
             fileDescriptorList.set(fd, file);
-            Lib.assertTrue(UserKernel.fileReference.open(filename));
+            SyscallException.check(UserKernel.fileReference.open(filename));
 
-            ret = 0;
-        } catch (Exception e) {
+            ret = fd;
+        } catch (SyscallException e) {
             e.printStackTrace();
         }
         return ret;
@@ -547,55 +570,53 @@ public class UserProcess {
         try {
             OpenFile file = fileDescriptorList.get(fd);
             byte[] buffer = new byte[size];
-            file.read(buffer, 0, size);
+            ret = file.read(buffer, 0, size);
             writeVirtualMemory(bufferAddr, buffer);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
         }
-        return 0;
+        return ret;
     }
 
     private int handleWrite(int fd, int bufferAddr, int size) {
         int ret = -1;
-        try {
-            OpenFile file = fileDescriptorList.get(fd);
-            byte[] buffer = new byte[size]; // too large size?
-            readVirtualMemory(bufferAddr, buffer);
-            file.write(buffer, 0, size);
-
-            ret = 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        try {
+        OpenFile file = fileDescriptorList.get(fd);
+        byte[] buffer = new byte[size]; // too large size?
+        readVirtualMemory(bufferAddr, buffer);
+        ret = file.write(buffer, 0, size);
+//        } catch (Throwable e) {
+//            e.printStackTrace();
+//        }
         return ret;
     }
 
     private int handleClose(int fd) {
         int ret = -1;
-        try {
-            OpenFile file = fileDescriptorList.get(fd);
-            file.close();
-            fileDescriptorList.free(fd);
-            UserKernel.fileReference.close(file.getName());
+//        try {
+        OpenFile file = fileDescriptorList.get(fd);
+        file.close();
+        fileDescriptorList.free(fd);
+        UserKernel.fileReference.close(file.getName());
 
-            ret = 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        ret = 0;
+//        } catch (Throwable e) {
+//            e.printStackTrace();
+//        }
         return ret;
     }
 
     private int handleUnlink(int name) {
         int ret = -1;
-        try {
-            String filename = readVirtualMemoryString(name, 256);
-            UserKernel.fileSystem.remove(filename);
-            UserKernel.fileReference.remove(filename);
+//        try {
+        String filename = readVirtualMemoryString(name, 256);
+        UserKernel.fileSystem.remove(filename);
+        UserKernel.fileReference.remove(filename);
 
-            ret = 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        ret = 0;
+//        } catch (Throwable e) {
+//            e.printStackTrace();
+//        }
         return ret;
     }
 
@@ -674,6 +695,7 @@ public class UserProcess {
             default:
                 Lib.debug(dbgProcess, "Unknown syscall " + syscall);
                 Lib.assertNotReached("Unknown system call!");
+                handleException(Processor.exceptionSyscall);
         }
         return 0;
     }
