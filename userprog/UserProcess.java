@@ -588,6 +588,7 @@ public class UserProcess {
             SyscallException.check(fd != -1, "no more file descriptors");
 
             OpenFile file = UserKernel.fileSystem.open(filename, false);
+            SyscallException.check(file != null);
             fileDescriptorList.set(fd, file);
             SyscallException.check(UserKernel.fileReference.open(filename));
 
