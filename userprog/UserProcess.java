@@ -19,7 +19,7 @@ class FileDescriptorList {
             if (fd[i] == null)
                 return i;
 //        SyscallException.check(false, "No Free File Description");
-        return 0;
+        return -1;
     }
 
     public OpenFile get(int id) {
@@ -39,6 +39,12 @@ class FileDescriptorList {
 }
 
 class SyscallException extends Exception {
+    private static boolean shouldPrintStackTrace = false;
+
+    public void print() {
+        if (shouldPrintStackTrace)
+            printStackTrace();
+    }
 
     public SyscallException(String message) {
         super(message);
@@ -261,7 +267,7 @@ public class UserProcess {
             TranslationEntry page = pageTable[vpn / pageSize];
             if (page == null || !page.valid || page.readOnly) {
                 Lib.debug('o', "Error when writing memory");
-                break;
+                return -1;
             }
             page.used = true;
             int ppn = page.ppn * pageSize + vpn % pageSize;
@@ -459,7 +465,7 @@ public class UserProcess {
 
     private int handleExit(int status) {
         int ret = -1;
-        try {
+//        try {
             exitCode = status;
             unloadSections();
 
@@ -474,15 +480,28 @@ public class UserProcess {
                 UThread.finish();
 
             ret = 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        } catch (SyscallException e) {
+//            e.print();
+//        }
         return ret;
+    }
+
+    void checkAddressValidity(int addr) throws SyscallException {
+        boolean invalid = false;
+        if (addr < 0 || addr / pageSize >= numPages)
+            invalid = true;
+        else {
+            TranslationEntry page = pageTable[addr / pageSize];
+        }
+
+        if (invalid)
+            throw new SyscallException("invalid address");
     }
 
     private int handleJoin(int pid, int retStatusAddr) {
         int ret = -1;
         try {
+            checkAddressValidity(retStatusAddr);
             UserProcess childProcess = null;
             for (UserProcess child : children) {
                 if (child.processId == pid) {
@@ -495,14 +514,14 @@ public class UserProcess {
             childProcess.mainThread.join();
 
             byte[] exitBytes = Lib.bytesFromInt(childProcess.exitCode);
-            writeVirtualMemory(retStatusAddr, exitBytes);
+            SyscallException.check(writeVirtualMemory(retStatusAddr, exitBytes) == 4);
 
             if (childProcess.unexpectedException != NO_EXCEPTION)
                 ret = 0;
             else
                 ret = 1;
         } catch (SyscallException e) {
-            e.printStackTrace();
+            e.print();
         }
         return ret;
     }
@@ -511,8 +530,11 @@ public class UserProcess {
         int ret = -1;
 
         try {
-            String filename = readVirtualMemoryString(nameAddr, 256);
+            checkAddressValidity(nameAddr);
+            checkAddressValidity(argvAddr);
             SyscallException.check(0 <= argc && argc < 256);
+
+            String filename = readVirtualMemoryString(nameAddr, 256);
             String[] argv = new String[argc];
             for (int i = 0; i < argc; ++i) {
                 byte[] curArg = new byte[4];
@@ -531,7 +553,7 @@ public class UserProcess {
                 ret = child.processId;
 
         } catch (SyscallException e) {
-            e.printStackTrace();
+            e.print();
         }
         return ret;
     }
@@ -539,15 +561,19 @@ public class UserProcess {
     private int handleCreate(int filenameAddr) {
         int ret = -1;
         try {
+            checkAddressValidity(filenameAddr);
+
             String filename = readVirtualMemoryString(filenameAddr, 256);
             int fd = fileDescriptorList.getFreeFD();
+            SyscallException.check(fd != -1, "no more file descriptors");
+
             OpenFile file = UserKernel.fileSystem.open(filename, true);
             fileDescriptorList.set(fd, file);
             SyscallException.check(UserKernel.fileReference.open(filename));
 
             ret = -1;
         } catch (SyscallException e) {
-            e.printStackTrace();
+            e.print();
         }
         return ret;
     }
@@ -555,71 +581,95 @@ public class UserProcess {
     private int handleOpen(int filenameAddr) {
         int ret = -1;
         try {
+            checkAddressValidity(filenameAddr);
+
             String filename = readVirtualMemoryString(filenameAddr, 256);
             int fd = fileDescriptorList.getFreeFD();
+            SyscallException.check(fd != -1, "no more file descriptors");
+
             OpenFile file = UserKernel.fileSystem.open(filename, false);
             fileDescriptorList.set(fd, file);
             SyscallException.check(UserKernel.fileReference.open(filename));
 
             ret = fd;
         } catch (SyscallException e) {
-            e.printStackTrace();
+            e.print();
         }
         return ret;
     }
 
     private int handleRead(int fd, int bufferAddr, int size) {
-        int ret = 0;
+        int ret = -1;
         try {
+            SyscallException.check(0 <= fd && fd < maxOpenedFile);
+            checkAddressValidity(bufferAddr);
+            if (size > 0)
+                checkAddressValidity(bufferAddr + size - 1);
             OpenFile file = fileDescriptorList.get(fd);
+            SyscallException.check(file != null, "invalid file descriptor");
+
             byte[] buffer = new byte[size];
-            ret = file.read(buffer, 0, size);
-            writeVirtualMemory(bufferAddr, buffer);
-        } catch (Throwable e) {
-            e.printStackTrace();
+            int bytesReadFromFile = file.read(buffer, 0, size);
+            SyscallException.check(writeVirtualMemory(bufferAddr, buffer) == bytesReadFromFile);
+            ret = bytesReadFromFile;
+        } catch (SyscallException e) {
+            e.print();
         }
         return ret;
     }
 
     private int handleWrite(int fd, int bufferAddr, int size) {
         int ret = -1;
-//        try {
-        OpenFile file = fileDescriptorList.get(fd);
-        byte[] buffer = new byte[size]; // too large size?
-        readVirtualMemory(bufferAddr, buffer);
-        ret = file.write(buffer, 0, size);
-//        } catch (Throwable e) {
-//            e.printStackTrace();
-//        }
+        try {
+            SyscallException.check(0 <= fd && fd < maxOpenedFile);
+            SyscallException.check(0 <= size && size < 65536, "improper size");
+            checkAddressValidity(bufferAddr);
+            if (size > 0)
+                checkAddressValidity(bufferAddr + size - 1);
+
+            OpenFile file = fileDescriptorList.get(fd);
+            SyscallException.check(file != null, "invalid file descriptor");
+
+            byte[] buffer = new byte[size];
+            SyscallException.check(readVirtualMemory(bufferAddr, buffer) == size);
+            ret = file.write(buffer, 0, size);
+        } catch (SyscallException e) {
+            e.print();
+        }
         return ret;
     }
 
     private int handleClose(int fd) {
         int ret = -1;
-//        try {
-        OpenFile file = fileDescriptorList.get(fd);
-        file.close();
-        fileDescriptorList.free(fd);
-        UserKernel.fileReference.close(file.getName());
+        try {
+            SyscallException.check(0 <= fd && fd < maxOpenedFile);
+            OpenFile file = fileDescriptorList.get(fd);
+            SyscallException.check(file != null, "file not opened");
 
-        ret = 0;
-//        } catch (Throwable e) {
-//            e.printStackTrace();
-//        }
+            file.close();
+            fileDescriptorList.free(fd);
+            UserKernel.fileReference.close(file.getName());
+
+            ret = 0;
+        } catch (SyscallException e) {
+            e.print();
+        }
         return ret;
     }
 
     private int handleUnlink(int name) {
         int ret = -1;
-//        try {
-        String filename = readVirtualMemoryString(name, 256);
-        UserKernel.fileSystem.remove(filename);
-        UserKernel.fileReference.remove(filename);
+        try {
+            checkAddressValidity(name);
 
-        ret = 0;
-//        } catch (Throwable e) {
-//            e.printStackTrace();
-//        }
+            String filename = readVirtualMemoryString(name, 256);
+            SyscallException.check(UserKernel.fileSystem.remove(filename));
+            SyscallException.check(UserKernel.fileReference.remove(filename));
+
+            ret = 0;
+        } catch (SyscallException e) {
+            e.print();
+        }
         return ret;
     }
 
@@ -774,4 +824,5 @@ public class UserProcess {
 
     public int NO_EXCEPTION = -1;
     private int unexpectedException = NO_EXCEPTION;
+
 }
