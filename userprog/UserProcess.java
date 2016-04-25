@@ -538,10 +538,11 @@ public class UserProcess {
             String[] argv = new String[argc];
             for (int i = 0; i < argc; ++i) {
                 byte[] curArg = new byte[4];
-                readVirtualMemory(argvAddr + i * 4, curArg);
+                SyscallException.check(readVirtualMemory(argvAddr + i * 4, curArg) == 4);
 
                 int argAddress = Lib.bytesToInt(curArg, 0);
 
+                checkAddressValidity(argAddress);
                 argv[i] = readVirtualMemoryString(argAddress, 256);
             }
             UserProcess child = newUserProcess();
@@ -568,10 +569,12 @@ public class UserProcess {
             SyscallException.check(fd != -1, "no more file descriptors");
 
             OpenFile file = UserKernel.fileSystem.open(filename, true);
-            fileDescriptorList.set(fd, file);
+            SyscallException.check(file != null);
             SyscallException.check(UserKernel.fileReference.open(filename));
 
-            ret = -1;
+            fileDescriptorList.set(fd, file);
+
+            ret = fd;
         } catch (SyscallException e) {
             e.print();
         }
@@ -589,8 +592,9 @@ public class UserProcess {
 
             OpenFile file = UserKernel.fileSystem.open(filename, false);
             SyscallException.check(file != null);
-            fileDescriptorList.set(fd, file);
             SyscallException.check(UserKernel.fileReference.open(filename));
+
+            fileDescriptorList.set(fd, file);
 
             ret = fd;
         } catch (SyscallException e) {
@@ -603,6 +607,7 @@ public class UserProcess {
         int ret = -1;
         try {
             SyscallException.check(0 <= fd && fd < maxOpenedFile);
+            SyscallException.check(0 <= size && size < numPages * pageSize);
             checkAddressValidity(bufferAddr);
             if (size > 0)
                 checkAddressValidity(bufferAddr + size - 1);
@@ -611,7 +616,7 @@ public class UserProcess {
 
             byte[] buffer = new byte[size];
             int bytesReadFromFile = file.read(buffer, 0, size);
-            SyscallException.check(writeVirtualMemory(bufferAddr, buffer) == bytesReadFromFile);
+            SyscallException.check(writeVirtualMemory(bufferAddr, buffer, 0, bytesReadFromFile) == bytesReadFromFile);
             ret = bytesReadFromFile;
         } catch (SyscallException e) {
             e.print();
@@ -633,7 +638,10 @@ public class UserProcess {
 
             byte[] buffer = new byte[size];
             SyscallException.check(readVirtualMemory(bufferAddr, buffer) == size);
-            ret = file.write(buffer, 0, size);
+            int bytesWrite = file.write(buffer, 0, size);
+            SyscallException.check(bytesWrite == size);
+
+            ret = bytesWrite;
         } catch (SyscallException e) {
             e.print();
         }
