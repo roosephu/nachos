@@ -672,8 +672,8 @@ public class UserProcess {
             checkAddressValidity(name);
 
             String filename = readVirtualMemoryString(name, 256);
-            SyscallException.check(UserKernel.fileSystem.remove(filename));
             SyscallException.check(UserKernel.fileReference.remove(filename));
+            SyscallException.check(UserKernel.fileSystem.remove(filename));
 
             ret = 0;
         } catch (SyscallException e) {

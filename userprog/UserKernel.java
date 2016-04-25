@@ -95,7 +95,6 @@ public class UserKernel extends ThreadedKernel {
                 return true;
             }
             OpenedFile openedFile = map.get(file);
-            openedFile.count -= 1;
             if (openedFile.count == 0) {
                 UserKernel.fileSystem.remove(file);
             } else {
