@@ -11,10 +11,14 @@
  */
 
 #include "syscall.h"
+#include "stdlib.h"
 
-int
-main()
+int main()
 {
     halt();
+    // Not reached.
+    int i;
+    for(i = 0; i < 10; i ++)
+    	printf("from halting program, %d\n", i);
     /* not reached */
 }
