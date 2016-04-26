@@ -117,6 +117,7 @@ public class UserProcess {
         if (!load(name, args))
             return false;
 
+        Lib.debug('o', String.format("exec: -%d, %s", numPages, name));
         UThread thread = new UThread(this);
         if (mainThread == null)
             mainThread = thread;
@@ -292,6 +293,9 @@ public class UserProcess {
     private boolean load(String name, String[] args) {
         Lib.debug(dbgProcess, "UserProcess.load(\"" + name + "\")");
 
+        if (!UserKernel.fileReference.open(name))
+            return false;
+
         OpenFile executable = UserKernel.fileSystem.open(name, false);
         if (executable == null) {
             Lib.debug(dbgProcess, "\topen failed");
@@ -302,6 +306,7 @@ public class UserProcess {
             coff = new Coff(executable);
         } catch (EOFException e) {
             executable.close();
+            UserKernel.fileReference.close(name);
             Lib.debug(dbgProcess, "\tcoff load failed");
             return false;
         }
@@ -312,6 +317,7 @@ public class UserProcess {
             CoffSection section = coff.getSection(s);
             if (section.getFirstVPN() != numPages) {
                 coff.close();
+                UserKernel.fileReference.close(name);
                 Lib.debug(dbgProcess, "\tfragmented executable");
                 return false;
             }
@@ -328,6 +334,7 @@ public class UserProcess {
         }
         if (argsSize > pageSize) {
             coff.close();
+            UserKernel.fileReference.close(name);
             Lib.debug(dbgProcess, "\targuments too long");
             return false;
         }
@@ -349,9 +356,13 @@ public class UserProcess {
         pageTable[numPages] = new TranslationEntry(numPages, UserKernel.allocPage(), true, false, false, false);
         numPages++;
 
-        Lib.debug('o', String.format("numpages: %d", numPages));
-        if (!loadSections())
+//        Lib.debug('o', String.format("numpages: %d", numPages));
+        if (!loadSections()) {
+            UserKernel.fileReference.close(name);
             return false;
+        }
+        coff.close();
+        UserKernel.fileReference.close(name);
 
         // store arguments in last page
         int entryOffset = (numPages - 1) * pageSize;
@@ -414,6 +425,7 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+        Lib.debug('o', String.format("exit: +%d, %s", numPages, UThread.currentThread().getName()));
         for (int i = 0; i < numPages; ++i) {
             int ppn = pageTable[i].ppn;
             UserKernel.freePage(ppn);
@@ -422,6 +434,8 @@ public class UserProcess {
             OpenFile file = fileDescriptorList.get(i);
             if (file != null) {
                 file.close();
+                if (i >= 2)
+                    UserKernel.fileReference.close(file.getName());
             }
         }
     }
@@ -561,6 +575,8 @@ public class UserProcess {
 
     private int handleCreate(int filenameAddr) {
         int ret = -1;
+        OpenFile file = null;
+
         try {
             checkAddressValidity(filenameAddr);
 
@@ -568,14 +584,18 @@ public class UserProcess {
             int fd = fileDescriptorList.getFreeFD();
             SyscallException.check(fd != -1, "no more file descriptors");
 
-            OpenFile file = UserKernel.fileSystem.open(filename, true);
-            SyscallException.check(file != null);
             SyscallException.check(UserKernel.fileReference.open(filename));
 
+            file = UserKernel.fileSystem.open(filename, true);
+            SyscallException.check(file != null);
             fileDescriptorList.set(fd, file);
 
             ret = fd;
         } catch (SyscallException e) {
+            if (file != null) {
+                file.close();
+                Lib.debug('o', "why do you reach here?");
+            }
             e.print();
         }
         return ret;
