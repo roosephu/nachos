@@ -12,7 +12,7 @@ public class Test {
         //selfTestJoin();
         //selfTestAlarm();
 //        selfTestPriority1();
-        selfTestPriority2();
+        //selfTestPriority2();
     }
 
     private static class PingTest implements Runnable {
