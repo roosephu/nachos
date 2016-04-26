@@ -431,12 +431,7 @@ public class UserProcess {
             UserKernel.freePage(ppn);
         }
         for (int i = 0; i < maxOpenedFile; ++i) {
-            OpenFile file = fileDescriptorList.get(i);
-            if (file != null) {
-                file.close();
-                if (i >= 2)
-                    UserKernel.fileReference.close(file.getName());
-            }
+            handleClose(i);
         }
     }
 
@@ -559,7 +554,7 @@ public class UserProcess {
                 checkAddressValidity(argAddress);
                 argv[i] = readVirtualMemoryString(argAddress, 256);
             }
-            UserProcess child = newUserProcess();
+            UserProcess child = new UserProcess();
             children.add(child);
 //            child.parent = this;
             if (!child.execute(filename, argv))
@@ -677,7 +672,8 @@ public class UserProcess {
 
             file.close();
             fileDescriptorList.free(fd);
-            UserKernel.fileReference.close(file.getName());
+            if (file.getFileSystem() != null)
+                UserKernel.fileReference.close(file.getName());
 
             ret = 0;
         } catch (SyscallException e) {
