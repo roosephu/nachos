@@ -1,0 +1,13 @@
+#include "syscall.h"
+
+void AssertEq(int a,int b,int line){
+	if (a!=b){
+		printf("assert fail %d %d!=%d\n",line,a,b);
+	}
+}
+
+int main() {
+	for(int i = 0; i < 10; i ++)
+		printf("from child_2, %d\n",i);
+	exit(1);
+}
