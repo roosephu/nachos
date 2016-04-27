@@ -25,19 +25,14 @@ void file_limit_test() {
 	AssertEq(creat("13"), 13, __LINE__);
 	AssertEq(creat("14"), 14, __LINE__);
 	AssertEq(creat("15"), 15, __LINE__);
-	// ****************************************  ATTENTION!!!
-	// Should not return 0 here in creat(16). Take care of what to do when open file exists 16.
 	AssertEq(creat("16"), -1, __LINE__);
 }
 
 
 void halt_from_invalid() {
-	int child_id = exec("halt.coff", 0, "");
+	int child_id = exec("halt.coff", 0, (char*)0);
 	int status;
 	int exit_status = join(child_id, &status);
-	// ****************************************  ATTENTION!!!
-	// Run the halt process which is not a root, the halt process should return immediately according
-	// to the halt definition in syscall.h, however the command after halt is executed.
 	AssertEq(exit_status, 1, __LINE__);
 	// Non-exist process id, should cause a exception.
 	exit_status = join(child_id+10, &status);
@@ -45,26 +40,53 @@ void halt_from_invalid() {
 }
 
 void join_test() {
-	int process_id = exec("child_1.coff", 0, "");
+	int process_id = exec("child_1.coff", 0, (char*)0);
 	int status;
 	int exit_status = join(process_id, &status); // The exit code of child_1 is the process id of child_3.
 	int new_status;
 	exit_status = join(status, &new_status);
 	// child_3 is not owned by this process, could not join and return -1, cause an exception.
 	AssertEq(exit_status, -1, __LINE__);
+	
+	//****************************************  ATTENTION!!!
 	//****************************************  ATTENTION!!!
 	// Join child_1 again, return -1 (I think here should return -1 according to syscall.h).
 	exit_status = join(process_id, &new_status);
 	AssertEq(exit_status, -1, __LINE__);
 }
 
-int main() {
-	halt_from_invalid();
-	join_test();
+void close_stdin_test() {
+
+	int status = unlink("stdin");
+	AssertEq(status, -1, __LINE__);
+	status = unlink("2");
+	AssertEq(status, 0, __LINE__);
+	status = unlink("file_not_exist");
+	AssertEq(status, -1, __LINE__);
+	status = unlink("");
+	AssertEq(status, -1, __LINE__);
+	char* empty;
+	status = unlink(empty);
+	AssertEq(status, -1, __LINE__);
+	
+	status = close(0);
+	AssertEq(status, 0, __LINE__);
 	//****************************************  ATTENTION!!!
-	// If you comment the two procedure above, the output of the following two test 
-	// will be different, haven't figure out the reason, cause there's no file operation
-	// in above two procedures.
+	//****************************************  ATTENTION!!!
+	// If join(commented now), everything is good, if no join, everything is strange.
+	// No join, output is random code, file desciptor is wrong. 
+	// If comment close(0), nothing strange, but why is stdin related?
+	int child_id = exec("halt.coff", 0, (char*)0);
+	//AssertEq(join(child_id, &status), 1, __LINE__);
+	status = unlink("halt.coff");
+	AssertEq(status, 0, __LINE__);	
+}
+
+int main() {
+	//halt_from_invalid();
+	//join_test();
+	
+	close_stdin_test();
 	file_limit_test();
 	open_nofile_test();
 	
