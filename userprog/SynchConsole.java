@@ -16,7 +16,7 @@ public class SynchConsole {
      */
     public SynchConsole(SerialConsole console) {
 	this.console = console;
-	
+
 	Runnable receiveHandler = new Runnable() {
 	    public void run() { receiveInterrupt(); }
 	};
@@ -38,7 +38,7 @@ public class SynchConsole {
      */
     public int readByte(boolean block) {
 	int value;
-	boolean intStatus = Machine.interrupt().disable();	
+	boolean intStatus = Machine.interrupt().disable();
 	readLock.acquire();
 
 	if (block || charAvailable) {
@@ -107,11 +107,11 @@ public class SynchConsole {
     private class File extends OpenFile {
 	File(boolean canRead, boolean canWrite) {
 	    super(null, "SynchConsole");
-	    
+
 	    this.canRead = canRead;
 	    this.canWrite = canWrite;
 	}
-	
+
 	public void close() {
 	    canRead = canWrite = false;
 	}
@@ -125,7 +125,7 @@ public class SynchConsole {
 		int value = SynchConsole.this.readByte(false);
 		if (value == -1)
 		    break;
-		
+
 		buf[offset+i] = (byte) value;
 	    }
 
@@ -135,10 +135,10 @@ public class SynchConsole {
 	public int write(byte[] buf, int offset, int length) {
 	    if (!canWrite)
 		return 0;
-	    
+
 	    for (int i=0; i<length; i++)
 		SynchConsole.this.writeByte(buf[offset+i]);
-	    
+
 	    return length;
 	}
 

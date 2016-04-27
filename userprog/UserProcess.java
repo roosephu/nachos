@@ -518,8 +518,8 @@ public class UserProcess {
                     break;
                 }
             }
-            SyscallException.check(childProcess != null);
-//            Lib.assertTrue(childProcess != null);
+            SyscallException.check(childProcess != null && !childProcess.joint);
+            childProcess.joint = true;
             childProcess.mainThread.join();
 
             byte[] exitBytes = Lib.bytesFromInt(childProcess.exitCode);
@@ -849,5 +849,5 @@ public class UserProcess {
 
     public int NO_EXCEPTION = -1;
     private int unexpectedException = NO_EXCEPTION;
-
+    public boolean joint = false;
 }
